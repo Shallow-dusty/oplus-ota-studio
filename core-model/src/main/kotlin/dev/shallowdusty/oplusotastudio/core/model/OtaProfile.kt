@@ -20,3 +20,17 @@ data class OtaProfile(
     /** Optional device codename, distinct from marketing model. */
     val deviceCodename: String? = null,
 )
+
+enum class OtaProfileValidationError {
+    MissingModel,
+    MissingOtaVersion,
+}
+
+fun OtaProfile.validationErrors(): Set<OtaProfileValidationError> =
+    buildSet {
+        if (model.isBlank()) add(OtaProfileValidationError.MissingModel)
+        if (otaVersion.isBlank()) add(OtaProfileValidationError.MissingOtaVersion)
+    }
+
+val OtaProfile.isLookupReady: Boolean
+    get() = validationErrors().isEmpty()

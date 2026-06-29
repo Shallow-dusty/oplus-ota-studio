@@ -1,6 +1,8 @@
 package dev.shallowdusty.oplusotastudio.core.model
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class OtaProfileTest {
@@ -34,5 +36,35 @@ class OtaProfileTest {
         assertEquals("Oxygen OS", profile.systemType)
         assertEquals("lemonade", profile.deviceCodename)
         assertEquals(OtaRegion.China, profile.region)
+    }
+
+    @Test
+    fun `validation accepts complete lookup profile`() {
+        val profile = OtaProfile(
+            model = "LE2123",
+            region = OtaRegion.Global,
+            otaVersion = "11.0.2.2.LE28AA",
+        )
+
+        assertEquals(emptySet<OtaProfileValidationError>(), profile.validationErrors())
+        assertTrue(profile.isLookupReady)
+    }
+
+    @Test
+    fun `validation reports missing required lookup fields`() {
+        val profile = OtaProfile(
+            model = " ",
+            region = OtaRegion.Global,
+            otaVersion = "",
+        )
+
+        assertEquals(
+            setOf(
+                OtaProfileValidationError.MissingModel,
+                OtaProfileValidationError.MissingOtaVersion,
+            ),
+            profile.validationErrors(),
+        )
+        assertFalse(profile.isLookupReady)
     }
 }
