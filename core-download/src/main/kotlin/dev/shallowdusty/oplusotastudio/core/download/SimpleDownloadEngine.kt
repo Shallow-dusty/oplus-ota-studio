@@ -101,13 +101,15 @@ class SimpleDownloadEngine(
                     tempFile.delete()
                 }
                 resumePlan?.truncateToBytes?.let { tempFile.truncateTo(it) }
-                val rangeStart = resumePlan?.rangeStart?.takeIf { it > 0L }
-                val requestBuilder = Request.Builder()
-                    .url(pkg.downloadUrl)
-                    .get()
-                rangeStart?.let { requestBuilder.header("Range", "bytes=$it-") }
-                val request = requestBuilder.build()
-                client.newCall(request).execute().use { response ->
+                var rangeStart = resumePlan?.rangeStart?.takeIf { it > 0L }
+                var response = client.newCall(buildRequest(rangeStart)).execute()
+                if (rangeStart != null && response.code == 416) {
+                    response.close()
+                    tempFile.delete()
+                    rangeStart = null
+                    response = client.newCall(buildRequest(rangeStart)).execute()
+                }
+                response.use {
                     if (!response.isSuccessful) {
                         updateState(
                             DownloadState.Failed(
@@ -185,6 +187,14 @@ class SimpleDownloadEngine(
                 state = state,
                 updatedAtMs = nowMs(),
             )
+        }
+
+        private fun buildRequest(rangeStart: Long?): Request {
+            val requestBuilder = Request.Builder()
+                .url(pkg.downloadUrl)
+                .get()
+            rangeStart?.let { requestBuilder.header("Range", "bytes=$it-") }
+            return requestBuilder.build()
         }
 
         private fun StoredDownloadTask.resumePlan(tempFile: File): ResumeRequestPlan? {
