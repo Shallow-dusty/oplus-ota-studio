@@ -95,6 +95,8 @@ class SimpleDownloadEngine(
         override suspend fun cancel() {
             job?.cancel()
             updateState(DownloadState.Canceled)
+            tempFile.delete()
+            taskStore?.deleteTask(taskId)
         }
 
         private suspend fun runDownload() {

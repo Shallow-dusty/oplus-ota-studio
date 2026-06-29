@@ -237,6 +237,36 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `cancel deletes part file and removes stored task`() = runTest {
+        val store = RecordingDownloadTaskStore()
+        val tempRoot = testTempRoot("cancel-cleanup")
+        val tempFile = tempRoot.resolve("task-1.zip.part").also { it.writeText("partial") }
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            idGenerator = { "task-1" },
+        )
+        val task = engine.enqueue(
+            OtaPackage(
+                versionName = "test",
+                type = "full",
+                sizeBytes = 3L,
+                sourceHost = "127.0.0.1",
+                downloadUrl = "http://127.0.0.1:1/pkg.zip",
+                md5 = null,
+            ),
+        )
+
+        task.cancel()
+
+        assertFalse(tempFile.exists())
+        assertEquals(StateUpdate(task.taskId, DownloadState.Canceled), store.updates.single())
+        assertEquals(listOf(task.taskId), store.deleted)
+    }
+
+    @Test
     fun `resumes existing partial file with range request`() = runTest {
         server.enqueue(
             MockResponse(
@@ -466,6 +496,7 @@ class SimpleDownloadEngineTest {
         val updates = mutableListOf<StateUpdate>()
         val resumeMetadata = mutableListOf<ResumeMetadataUpdate>()
         val finalPaths = mutableListOf<FinalPathUpdate>()
+        val deleted = mutableListOf<String>()
 
         override suspend fun createQueuedTask(
             taskId: String,
@@ -504,7 +535,9 @@ class SimpleDownloadEngineTest {
 
         override suspend fun getTask(taskId: String): StoredDownloadTask? = existingTasks[taskId]
 
-        override suspend fun deleteTask(taskId: String) = Unit
+        override suspend fun deleteTask(taskId: String) {
+            deleted += taskId
+        }
 
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
     }
