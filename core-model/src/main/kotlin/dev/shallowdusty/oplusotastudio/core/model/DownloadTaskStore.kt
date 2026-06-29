@@ -44,5 +44,7 @@ interface DownloadTaskStore {
 
     suspend fun getTask(taskId: String): StoredDownloadTask?
 
+    suspend fun deleteTask(taskId: String)
+
     fun observeTasks(): Flow<List<StoredDownloadTask>>
 }

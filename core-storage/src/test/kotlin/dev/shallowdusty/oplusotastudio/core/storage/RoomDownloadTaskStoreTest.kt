@@ -173,6 +173,24 @@ class RoomDownloadTaskStoreTest {
         assertEquals(true, task?.acceptRanges)
     }
 
+    @Test
+    fun `deleteTask removes stored task row`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ),
+        )
+
+        store.deleteTask("task-1")
+
+        assertEquals(emptyList<DownloadTaskEntity>(), dao.rows.value)
+    }
+
     private fun samplePackage(): OtaPackage =
         OtaPackage(
             versionName = "14.0.0.1901",

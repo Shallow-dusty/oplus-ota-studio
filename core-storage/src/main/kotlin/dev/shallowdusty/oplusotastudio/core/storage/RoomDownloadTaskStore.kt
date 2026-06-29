@@ -70,6 +70,10 @@ class RoomDownloadTaskStore(
     override suspend fun getTask(taskId: String): StoredDownloadTask? =
         downloadTaskDao.get(taskId)?.toStoredDownloadTask()
 
+    override suspend fun deleteTask(taskId: String) {
+        downloadTaskDao.delete(taskId)
+    }
+
     override fun observeTasks(): Flow<List<StoredDownloadTask>> =
         downloadTaskDao.observeAll().map { rows ->
             rows.map { it.toStoredDownloadTask() }

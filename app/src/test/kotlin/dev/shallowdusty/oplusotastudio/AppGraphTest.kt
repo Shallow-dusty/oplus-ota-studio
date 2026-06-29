@@ -211,6 +211,8 @@ class AppGraphTest {
 
         override suspend fun getTask(taskId: String): StoredDownloadTask? = null
 
+        override suspend fun deleteTask(taskId: String) = Unit
+
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(observedTasks)
     }
 }

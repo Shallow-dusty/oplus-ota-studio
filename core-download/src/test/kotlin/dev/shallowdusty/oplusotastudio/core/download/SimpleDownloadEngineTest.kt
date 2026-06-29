@@ -504,6 +504,8 @@ class SimpleDownloadEngineTest {
 
         override suspend fun getTask(taskId: String): StoredDownloadTask? = existingTasks[taskId]
 
+        override suspend fun deleteTask(taskId: String) = Unit
+
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
     }
 }
