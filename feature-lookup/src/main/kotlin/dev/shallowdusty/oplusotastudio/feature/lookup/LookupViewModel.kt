@@ -11,6 +11,7 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
+import dev.shallowdusty.oplusotastudio.core.model.isLookupReady
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -85,7 +86,7 @@ class LookupViewModel(
     fun lookup() {
         val ready = _uiState.value as? LookupUiState.Ready ?: return
         val profile = ready.profile
-        if (profile.otaVersion.isBlank()) return // spec §2.3: block incomplete profiles
+        if (!profile.isLookupReady) return // spec §2.3: block incomplete profiles
         viewModelScope.launch {
             _uiState.value = LookupUiState.Querying
             _uiState.value = when (val result = lookupService.lookup(profile)) {

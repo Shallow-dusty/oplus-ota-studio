@@ -105,15 +105,32 @@ class LookupViewModelTest {
 
     @Test
     fun `lookup is a no-op when otaVersion is blank`() = runTest {
+        val lookupService = FakeLookupService(OtaLookupResult.NoUpdate)
         val vm = LookupViewModel(
             deviceDetector = FakeDeviceDetector(completeProfile()),
-            lookupService = FakeLookupService(OtaLookupResult.NoUpdate),
+            lookupService = lookupService,
         )
         vm.updateProfile(OtaProfile(model = "LE2123", region = OtaRegion.Global, otaVersion = ""))
         vm.lookup()
         advanceUntilIdle()
         // Should stay Ready — blank version blocked (spec §2.3).
         assertTrue(vm.uiState.value is LookupUiState.Ready)
+        assertEquals(0, lookupService.calls)
+    }
+
+    @Test
+    fun `lookup is a no-op when model is blank`() = runTest {
+        val lookupService = FakeLookupService(OtaLookupResult.NoUpdate)
+        val vm = LookupViewModel(
+            deviceDetector = FakeDeviceDetector(completeProfile()),
+            lookupService = lookupService,
+        )
+        vm.updateProfile(OtaProfile(model = " ", region = OtaRegion.Global, otaVersion = "11.0.2.2.LE28AA"))
+        vm.lookup()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value is LookupUiState.Ready)
+        assertEquals(0, lookupService.calls)
     }
 
     @Test
@@ -206,7 +223,13 @@ class LookupViewModelTest {
     }
 
     private class FakeLookupService(private val result: OtaLookupResult) : OtaLookupService {
-        override suspend fun lookup(profile: OtaProfile): OtaLookupResult = result
+        var calls = 0
+            private set
+
+        override suspend fun lookup(profile: OtaProfile): OtaLookupResult {
+            calls += 1
+            return result
+        }
     }
 
     private class RecordingDownloadEngine : DownloadEngine {
