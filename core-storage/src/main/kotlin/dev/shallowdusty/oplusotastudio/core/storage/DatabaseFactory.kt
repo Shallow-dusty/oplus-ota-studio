@@ -10,4 +10,5 @@ fun createOtaStudioDatabase(context: Context): OtaStudioDatabase =
         context.applicationContext,
         OtaStudioDatabase::class.java,
         DATABASE_NAME,
-    ).build()
+    ).addMigrations(MIGRATION_1_2)
+        .build()
