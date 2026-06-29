@@ -20,23 +20,229 @@ The app is split into focused modules:
 - `core-model`: immutable domain models for devices, OTA profiles, packages, download state, and verification results.
 - `core-ota`: OTA request construction, response parsing, region/build validation, and stable error mapping.
 - `core-download`: streaming download engine, range resume, temporary file handling, checksum calculation, and final file promotion.
-- `core-storage`: Room entities for history and DataStore preferences for user choices.
+- `core-storage`: Room entities for history and download state, plus DataStore preferences for user choices.
 - `feature-lookup`: device/profile screen and OTA query result screen.
 - `feature-downloads`: download queue, active progress surface, file actions, and verification details.
 
 Keep the domain layer Android-light where practical so the OTA parser, download state machine, and checksum logic can be unit-tested without an emulator.
 
-## First Version User Flow
+## 1. OTA Protocol Contract
+
+> **Verification status convention.** This section is a *reference contract* distilled from publicly observable OPlus/OnePlus OTA behavior. Field names and paths marked ✅ are well-established from public research; those marked ❓ must be confirmed by on-device packet capture during implementation week 1 before being relied on. Treat the contract as the code/test skeleton, not as ground truth until verified.
+
+### 1.1 Host / Region Matrix
+
+OPlus routes OTA queries to region-specific CDN front-ends. Non-root devices reach these over HTTPS. Known host families (verify current resolution before pinning):
+
+| Region | Host (❓ verify) | Notes |
+|---|---|---|
+| Global / generic | `otagm.oppo.com` | Common fallback for non-CN builds |
+| India | `otadiu.oppo.com` | Distinct pool for IN region |
+| International | `otai.oppo.com` | EU/SEA mixed |
+| China | `otacn.oppo.com` (❓) | CN builds; may differ for OnePlus vs OPPO |
+| OnePlus legacy | `ota*.oneplus.cn` (❓ deprecated) | Pre-merge OxygenOS hosts; may redirect |
+
+The app should resolve the target host from the detected region, never hard-code a single endpoint. Maintain the mapping as a versioned data file in `core-ota` so it can be updated without an app release if OPlus rotates hosts.
+
+### 1.2 Request Contract (reference)
+
+OPlus services have shipped both a legacy XML/form style (OnePlus lineage) and a newer JSON style (ColorOS lineage). The first implementation must support **both** and select per detected build family.
+
+**Style A — OnePlus XML/form (legacy OxygenOS):**
+
+- Method: `POST`
+- Path: ❓ `/OnePlusOTA/OnePlus_OTA.php` (legacy; confirm)
+- Headers: `Content-Type: application/x-www-form-urlencoded`
+- Body fields:
+  - `systemType` ✅ — `"Oxygen OS"` / `"Color OS"`
+  - `otaVersion` ✅ — full build string, e.g. `11.0.2.2.LE28AA`
+  - `mode` ❓ — `"full"` vs incremental
+  - `device` ✅ — model codename
+  - `serialNumber` ❓ — device serial (PII; see §7 Privacy)
+- Response: XML
+  - `<Command>` ✅ — `NEW_VERSION` / `NO_NEW_VERSION`
+  - `<versionName>` ✅, `<size>` ✅, `<md5>` ✅, `<url>` ✅, `<type>` ❓
+
+**Style B — OPlus JSON (ColorOS):**
+
+- Method: `POST`
+- Path: ❓ confirm
+- Headers: `Content-Type: application/json`
+- Body fields (❓ confirm names):
+  - `model`, `region`, `romVersion`, `otaVersion`, `androidVersion`
+- Response: JSON
+  - `data.url`, `data.size`, `data.md5`, `data.versionName` (❓ shape)
+
+### 1.3 Response Model
+
+`core-ota` must parse both styles into one canonical domain model:
+
+```kotlin
+sealed interface OtaLookupResult {
+    data class PackageFound(val pkg: OtaPackage) : OtaLookupResult
+    data object NoUpdate : OtaLookupResult
+    data class Error(val category: OtaErrorCategory, val raw: String?) : OtaLookupResult
+}
+```
+
+`OtaPackage` carries `versionName`, `type`, `sizeBytes`, `sourceHost`, `downloadUrl`, `md5?`, `sha256?`, `releaseNotes?`.
+
+### 1.4 Authentication / Signature
+
+- No documented static API token is known for the public OTA path. The server historically keys on model + build + region.
+- ❓ Confirm whether any header (e.g. `User-Agent` OEM string, `X-OPT-*`) is required by capturing a real request. If a custom UA is needed, send a neutral app UA plus the device's real build string — do not impersonate the system OTA client beyond what is required to get a valid response.
+
+### 1.5 Week-1 Verification Protocol
+
+Before writing `core-ota` parsing logic against fixtures, capture ground truth:
+
+1. On a real OPlus/OnePlus device, run `mitmproxy` (or `HttpToolkit`) with the system CA installed (or use `adb shell` root trace if available) to intercept the system OTA client's request.
+2. Record one success, one no-update, and one error response per build family (OxygenOS + ColorOS).
+3. Scrub any IMEI/serial from the captured requests before committing fixtures (see §7).
+4. Commit redacted fixtures under `core-ota/src/test/resources/fixtures/` as the canonical parser inputs.
+5. Update §1.1/§1.2 host and field tables in this spec from the capture, flipping ❓ → ✅.
+
+## 2. Device Detection Signals
+
+The lookup is only as good as the profile it sends. Detection must run on first launch and produce a best-effort profile, then offer manual override.
+
+### 2.1 Signal Inventory
+
+All signals below are readable **without root** via `Build.*` constants or reflection on `android.os.SystemProperties` (the `getprop` keys surface through reflection; wrap in a single `SystemPropertiesAccessor` so it can be faked in tests).
+
+| Field | Source | Root needed | Notes |
+|---|---|---|---|
+| Model name / codename | `Build.MODEL`, `Build.PRODUCT` | No | |
+| Marketing name | `ro.oppo.market.name` ❓ / `ro.product.marketname` ❓ | No (reflection) | Confirm key for current OPlus builds |
+| OxygenOS/ColorOS version | `ro.build.version.ota` ✅, `ro.oppo.version` ❓, `ro.build.version.opporom` ❓ | No (reflection) | Try in order; first non-empty wins |
+| Build display string | `Build.DISPLAY` | No | Source of `otaVersion` |
+| Android version | `Build.VERSION.RELEASE` / `SDK_INT` | No | |
+| Security patch | `Build.VERSION.SECURITY_PATCH` | No | Display only |
+| Region | `ro.oppo.region` ❓, SIM MCC, locale | No | See §2.2 |
+| Serial | `Build.getSerial()` | Requires READ_PRIVILEGED_PHONE_STATS on API 26+ | Treat as optional; never required |
+
+### 2.2 Region Inference Order
+
+Resolve region with the first non-empty hit:
+
+1. `ro.oppo.region` / `ro.oppo.market.name` suffix (❓ confirm)
+2. SIM ISO country code (`TelephonyManager.getSimCountryIso()`) — requires READ_PHONE_STATE
+3. `TelephonyManager.getNetworkCountryIso()`
+4. `Resources.configuration.locales[0]` country
+5. Default: `global`; surface a "region inferred, confirm?" hint
+
+### 2.3 Detection Robustness
+
+- Any `SystemProperties` reflection failure must degrade silently to `Build.*` constants, never crash.
+- If the OxygenOS/ColorOS version key is empty, mark the profile `incomplete` and block lookup until the user enters a manual build string.
+- Detection runs on a background dispatcher; the dashboard shows a brief "detecting…" skeleton, never a blank screen.
+
+## 3. Download and Storage Design
+
+### 3.1 Engine Selection
+
+- **OkHttp** for HTTP with explicit `Range` header support and an interceptor that records `ETag`/`Last-Modified`/`Accept-Ranges`.
+- **WorkManager** foreground worker for lifecycle, with `ForegroundServiceType_DATA_SYNC` on Android 14+.
+- **Single-task serial queue** for v1. Concurrent downloads add complexity (bandwidth, storage, verification ordering) with little user benefit for a phone utility. Multiple queued tasks are allowed; only one runs at a time.
+- Do **not** use `DownloadManager` — it hides resume/etag state and cannot verify checksums mid-stream.
+
+### 3.2 Storage Location
+
+Final ZIPs go to **`MediaStore.Downloads`** (external, user-visible in the system Files app, survives app uninstall on Android 10+ via the public Downloads collection). Rationale: users expect to flash or copy the ZIP from outside the app; app-specific storage would hide it.
+
+- On Android 10+ use the scoped `MediaStore` write path with `RELATIVE_PATH = Environment.DIRECTORY_DOWNLOADS/<AppName>`.
+- On API 28 and below, fall back to `Environment.getExternalStoragePublicDirectory(DOWNLOADS)/<AppName>` with the legacy storage permission.
+- Temp file lives in **app-specific external cache** (`context.cacheDir`), never on shared storage, so partial downloads are not visible to the user or other apps. Temp filename = `<taskId>.zip.part`.
+
+### 3.3 Range Resume Persistence
+
+Persist per-task state in Room (`download_task` table):
+
+- `taskId`, `downloadUrl`, `sourceHost`
+- `etag`, `lastModified` (captured on first response)
+- `acceptRanges: Boolean`
+- `downloadedBytes: Long`
+- `tempFileName`
+- `state: DownloadState`
+- `targetSize: Long?`, `md5?`, `sha256?`
+
+On resume:
+1. If `acceptRanges == true` AND the server still returns the same `ETag`/`Last-Modified` for a `HEAD` (or the first range `GET` returns `206`), send `Range: bytes=<downloadedBytes>-` and append to `.part`.
+2. If `acceptRanges == false` or the etag changed, discard `.part` and restart from 0. Surface "server changed package, restarting" as the reason.
+3. Verify `.part` size matches `downloadedBytes` before resuming; if larger (interrupted double-write), truncate to `downloadedBytes`.
+
+### 3.4 Network and Doze Strategy
+
+- Register a `NetworkCallback`; on loss, transition to `Paused(NetworkLost)` and let WorkManager retry with backoff when connectivity returns.
+- On metered vs unmetered switch, respect the user's "download on Wi-Fi only" preference (default on).
+- Rely on WorkManager constraints (`NetworkType.UNMETERED` when toggled) rather than holding a `PowerManager.WakeLock` for the whole transfer. Acquire a `PARTIAL_WAKE_LOCK` only for the brief checksum pass after completion if needed.
+- Honor `BatteryTooLow` (default threshold 15%) as a pause condition.
+
+### 3.5 Download State Machine
+
+```
+                         ┌─────────────┐
+            enqueue ────▶│   Queued    │
+                         └──────┬──────┘
+                                │ start
+                         ┌──────▼──────┐
+              ┌──────────│   Running   │──────────┐
+              │          └──────┬──────┘          │
+              │ pause           │ complete        │ cancel
+       ┌──────▼─────┐    ┌──────▼──────┐   ┌──────▼─────┐
+       │   Paused   │    │  Verifying  │   │ Canceled   │
+       └──────┬─────┘    └──────┬──────┘   └────────────┘
+              │ resume          │ ok              │
+              │            ┌────▼────┐            │
+              │            │Verified │            │
+              │            └─────────┘            │
+              │                                   │
+       ┌──────▼──────┐   network/error ┌──────────▼─────┐
+       │  Retrying   │◀────────────────│     Failed     │
+       └─────────────┘                 └────────────────┘
+```
+
+Rules:
+- `Failed` → `Retrying` only if the error category is retriable (network/server, not file/storage). After N=3 retries, stay `Failed` and surface the reason.
+- `Verifying` is a terminal-ish gate: only `Verified` or `Failed(ChecksumMismatch)`/`Failed(VerifyError)` exit it.
+- `Canceled` deletes `.part` and the Room row on the next idle tick.
+- Every transition persists to Room before notifying the UI, so process death always observes a recoverable state.
+
+### 3.6 Temp File Hygiene
+
+- On app start, scan `cacheDir` for `*.zip.part` with no matching Room task (orphaned) and delete them.
+- On low-storage warning (`ComponentCallbacks2.onTrimMemory(TRIM_MEMORY_RUNNING_LOW_CRITICAL)`), do not delete active `.part` files, but reject new enqueues.
+- Keep a cap on total queue size (default 20 tasks) to bound storage use.
+
+## 4. Integrity Verification
+
+### 4.1 Checksum Policy
+
+- Prefer **SHA-256** if the server provides it; fall back to **MD5** (the legacy OxygenOS field). If neither is present, mark the package `unverified` and warn the user explicitly in the UI.
+- Compute the hash by streaming the completed `.part` file in 1 MiB chunks on `Dispatchers.IO`; never load the whole file into memory.
+- Expose verify progress as a separate channel from download progress so the UI can show "downloading" vs "verifying".
+
+### 4.2 Signature Scope
+
+v1 verifies **transfer integrity only** (the checksum above). Full APK/OTA-signature verification (checking the package is signed by OPlus) is a future, root-optional phase — note this limitation in the UI ("transfer verified, not package-signed").
+
+### 4.3 Failure Handling
+
+On mismatch:
+- Do **not** auto-delete the `.part`. Move it aside as `<taskId>.zip.bad` in cache and offer "discard" vs "retry download" actions.
+- Persist the mismatched hash and expected hash in the history record for debugging.
+
+## 5. First Version User Flow
 
 1. The app opens to a dense but clean dashboard showing detected model, region, Android/OxygenOS/ColorOS build, and network status.
 2. The user can accept detected values or switch to manual profile mode.
 3. The lookup action returns either a package card or a structured no-update/error state.
-4. The package card shows version, type, size, source host, MD5 when available, and actions for download or copy link.
+4. The package card shows version, type, size, source host, MD5/SHA-256 when available, and actions for download or copy link.
 5. Download runs as a foreground task with pause/resume/cancel, progress, speed, ETA, and persistent notification.
-6. After completion, the app verifies MD5 if available, then moves the final ZIP into a stable app-managed downloads folder.
+6. After completion, the app verifies the checksum if available, then promotes the final ZIP to the public Downloads collection (`MediaStore.Downloads/<AppName>`).
 7. History keeps successful lookups and downloaded packages so users can re-open metadata, copy links, or locate files.
 
-## Interaction Design
+## 6. Interaction Design
 
 The UI should feel like a serious utility, not a landing page. Use restrained Material 3 surfaces, compact information density, clear state colors, and icons for actions. Avoid decorative hero sections and oversized marketing copy.
 
@@ -48,13 +254,13 @@ Important states must be explicit:
 
 Use progressive disclosure for advanced fields. Normal users should see detected device details and one primary lookup action. Advanced users can expand spoof/build override controls without cluttering the default screen.
 
-## Performance Requirements
+## 7. Performance Requirements
 
-Downloads must stream directly to disk and never buffer full ZIP files in memory. Progress updates should be throttled so Compose recomposition stays smooth. Large history lists should use lazy lists and stable keys. Checksum calculation should run on a background dispatcher and expose progress separately from network progress.
+Downloads must stream directly to disk and never buffer full ZIP files in memory. Progress updates should be throttled (≤ 4 updates/sec, or on each 1 MiB written, whichever is rarer) so Compose recomposition stays smooth. Large history lists should use lazy lists with stable keys. Checksum calculation should run on a background dispatcher and expose progress separately from network progress.
 
-The app should survive process death during active downloads by persisting enough state to recover or mark the task as interrupted. It should avoid keeping wake locks directly unless a specific Android API path requires it; foreground work and system download constraints should carry the normal case.
+The app should survive process death during active downloads by persisting enough state (§3.3, §3.5) to recover or mark the task as interrupted. It should avoid keeping wake locks directly unless a specific Android API path requires it; foreground work and system download constraints should carry the normal case.
 
-## Error Handling
+## 8. Error Handling
 
 Errors should be mapped into user-understandable categories:
 
@@ -65,16 +271,80 @@ Errors should be mapped into user-understandable categories:
 
 Every failed lookup or download should expose a compact reason and a details view suitable for debugging or future PC companion export.
 
-## Testing Strategy
+## 9. Observability
+
+- Structured logs via a thin app logger wrapping `android.util.Log` in debug; in release, logs are written to a rolling local file under `context.filesDir/logs/` capped at 5 MiB total. Nothing is uploaded.
+- Log levels: `ERROR` (failures), `WARN` (retries, degraded paths), `INFO` (task state transitions), `DEBUG` (HTTP host/status, download bytes — never bodies).
+- Redact PII before logging: IMEI, serial, MAC, full build string is allowed but serial is masked to last 4 chars.
+- The details view (§8) surfaces the last N log lines and the current task's error chain, exportable as a `.zip` for the future PC companion.
+
+## 10. Privacy and Compliance
+
+- **Fingerprint disclosure:** the OTA request necessarily sends model, build, and region to OPlus CDN. Manual profile mode may send user-entered values. Show a one-time disclosure ("This app queries OPlus servers with your device's build info. Continue?") before the first lookup, and link it from manual profile mode.
+- **Optional fields:** serial/IMEI are never required for a lookup. If a captured reference request includes them, omit them by default and only include if a lookup fails without them (then prompt the user).
+- **Transport:** HTTPS only. Disable cleartext to OTA hosts via `networkSecurityConfig`. Certificate pinning is deferred (pins would need capture and break on host rotation); rely on system trust for v1.
+- **Storage:** downloaded ZIPs go to public Downloads; the app does not read or modify other files there.
+- **Trademark & naming:** "OPlus", "OnePlus", "OxygenOS", "ColorOS" are trademarks. App name, package id, and store listing must not imply official affiliation. Recommended package id: `dev.shallowdusty.oplusotastudio` (neutral). No OPlus logo/assets in the app.
+- **License:** Apache-2.0 for the codebase. Fixture data derived from real OTA responses must be redacted and is not redistributable as-is.
+
+## 11. Testing Strategy
 
 Use TDD for behavior-heavy code:
 
-- Unit tests for OTA profile normalization and request payload generation.
-- Unit tests for OTA response parsing with successful, no-update, malformed, and missing-field fixtures.
-- Unit tests for download state transitions, resume header calculation, file promotion rules, and checksum mismatch.
-- UI tests for lookup state rendering and primary download interactions after the core flows exist.
+- Unit tests for OTA profile normalization and request payload generation (Style A and Style B).
+- Unit tests for OTA response parsing with successful, no-update, malformed, and missing-field fixtures (redacted captures from §1.5).
+- Unit tests for download state transitions (full state machine in §3.5), resume header calculation, etag-change discard, file promotion rules, and checksum mismatch.
+- Integration tests with a fake `MockWebServer` covering: full download + verify, resume after disconnect, server-side package change, and checksum mismatch.
+- Instrumentation tests for storage promotion to `MediaStore.Downloads` across API 26/29/34.
+- UI tests for lookup state rendering and primary download interactions after the core flows exist; add Compose screenshot tests for each state in §6.
 
-The first implementation should prefer fake HTTP servers and local temp files over mocks where possible.
+The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver`) and local temp files over mocks where possible.
+
+## 12. Internationalization
+
+- Ship with `en` and `zh-rCN` from day one; design strings as resources, never inline.
+- All OPlus build strings, region codes, and error categories are data, not translatable strings.
+- Format sizes (`42.3 MB`), dates, and speeds via `NumberFormat`/`DateUtils` with the device locale.
+
+## 13. Engineering Baseline
+
+- **minSdk 26** (covers ~98% of active OPlus devices; Android 8.0 is the practical floor for current OxygenOS/ColorOS), **targetSdk 35**.
+- **Kotlin 2.0.x**, **Jetpack Compose BOM** latest stable, **AGP 8.x**, **JDK 17**.
+- Build variants: `debug` (verbose logs, no R8), `release` (R8 full mode, obfuscation on, signed via a keystore stored outside the repo).
+- Lint and `detekt` run in CI; new code must be clean.
+- **CI:** GitHub Actions matrix (unit tests on JVM, instrumentation on API 29/34 emulators via `reactivecircus/android-emulator-runner`). Block merges on red unit tests; instrumentation is informational until stable.
+- **Branch & commit:** trunk `main` protected; feature branches `feat/`, `fix/`, `docs/`; squash-merge PRs; conventional-commit messages (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
+- **Dependencies:** version catalog (`libs.versions.toml`); no snapshot dependencies in `main`.
+
+## 14. Milestones and Acceptance Criteria
+
+### v0.1 — Core MVP (lookup + download + verify)
+
+Done when:
+- [ ] Device detection (§2) fills a profile on a real OnePlus and a real OPPO device.
+- [ ] Lookup returns a `PackageFound` against a captured fixture and against the live OPlus endpoint for at least one region.
+- [ ] A full ZIP downloads end-to-end with resume after a forced network drop, and is promoted to `MediaStore.Downloads`.
+- [ ] Checksum verification passes on a known-good package and fails (explicitly) on a tampered one.
+- [ ] All §11 unit and MockWebServer integration tests green.
+
+### v0.2 — Profile control + history
+
+Done when:
+- [ ] Manual profile mode accepts overrides, validates fields, and round-trips a lookup.
+- [ ] History list persists lookups and downloads across process death; lazy list scrolls smoothly with 100+ entries.
+- [ ] Region/host override exposed in advanced (progressive disclosure) section.
+
+### v0.3 — Release candidate polish
+
+Done when:
+- [ ] `en` + `zh-rCN` strings complete; no hardcoded user-facing text.
+- [ ] Error categories in §8 all have user-facing copy and a details view.
+- [ ] Local logging + export (§9) wired to the details view.
+- [ ] R8 release build installs and runs; CI green on emulator matrix.
+
+### Future
+
+- PC companion (ADB), root-optional package-signature verification, optional certificate pinning, additional locales.
 
 ## Future PC Companion
 
@@ -86,4 +356,4 @@ The PC companion should be treated as a second product surface, not a dependency
 
 Create the local project at `E:\coding\oplus-ota-studio`.
 
-Create a GitHub repository named `oplus-ota-studio` under the `Shallow-dusty` account. Start private until the app has a working first release candidate. The repository should contain the spec, implementation plan, Android project, tests, and later release artifacts.
+Create a GitHub repository named `oplus-ota-studio` under the `Shallow-dusty` account. Start private until the app has a working first release candidate (v0.3). The repository should contain the spec, implementation plan, Android project, tests, and later release artifacts. Add an `Apache-2.0` LICENSE, a `README` pointing to this spec, a `.github/workflows/` CI pipeline per §13, and branch protection on `main` (require PR review + green CI).
