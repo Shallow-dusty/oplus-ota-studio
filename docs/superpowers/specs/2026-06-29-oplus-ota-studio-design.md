@@ -42,11 +42,11 @@ OPlus routes OTA queries to region-specific CDN front-ends. Non-root devices rea
 | China | `otacn.oppo.com` (❓) | CN builds; may differ for OnePlus vs OPPO |
 | OnePlus legacy | `ota*.oneplus.cn` (❓ deprecated) | Pre-merge OxygenOS hosts; may redirect |
 
-The app should resolve the target host from the detected region, never hard-code a single endpoint. Maintain the mapping as a versioned data file in `core-ota` so it can be updated without an app release if OPlus rotates hosts.
+The app should resolve the target host from the detected region, never hard-code a single endpoint. For v1, maintain the mapping as a built-in versioned data file in `core-ota`, expose an advanced manual host override, and allow later JSON import/export for updated host maps. Do not introduce a remote configuration service in v1.
 
 ### 1.2 Request Contract (reference)
 
-OPlus services have shipped both a legacy XML/form style (OnePlus lineage) and a newer JSON style (ColorOS lineage). The first implementation must support **both** and select per detected build family.
+OPlus services have shipped both a legacy XML/form style (OnePlus lineage) and a newer JSON style (ColorOS lineage). The architecture must support multiple protocol strategies, but v0.1 only has to ship the first strategy verified against a real device and live endpoint. Prefer the OnePlus 9 Pro CN / ColorOS chain we already have access to; keep the other style as a testable strategy stub until captures or replay data prove the contract.
 
 **Style A — OnePlus XML/form (legacy OxygenOS):**
 
@@ -58,7 +58,7 @@ OPlus services have shipped both a legacy XML/form style (OnePlus lineage) and a
   - `otaVersion` ✅ — full build string, e.g. `11.0.2.2.LE28AA`
   - `mode` ❓ — `"full"` vs incremental
   - `device` ✅ — model codename
-  - `serialNumber` ❓ — device serial (PII; see §7 Privacy)
+  - `serialNumber` ❓ — device serial (PII; see §10 Privacy and Compliance)
 - Response: XML
   - `<Command>` ✅ — `NEW_VERSION` / `NO_NEW_VERSION`
   - `<versionName>` ✅, `<size>` ✅, `<md5>` ✅, `<url>` ✅, `<type>` ❓
@@ -94,13 +94,16 @@ sealed interface OtaLookupResult {
 
 ### 1.5 Week-1 Verification Protocol
 
-Before writing `core-ota` parsing logic against fixtures, capture ground truth:
+Before writing `core-ota` parsing logic against fixtures, establish at least one ground-truth chain:
 
-1. On a real OPlus/OnePlus device, run `mitmproxy` (or `HttpToolkit`) with the system CA installed (or use `adb shell` root trace if available) to intercept the system OTA client's request.
-2. Record one success, one no-update, and one error response per build family (OxygenOS + ColorOS).
-3. Scrub any IMEI/serial from the captured requests before committing fixtures (see §7).
-4. Commit redacted fixtures under `core-ota/src/test/resources/fixtures/` as the canonical parser inputs.
-5. Update §1.1/§1.2 host and field tables in this spec from the capture, flipping ❓ → ✅.
+1. Collect local device facts with `adb shell getprop`, Android `Build.*`, and the current OTA/build strings. **Provenance note:** `getprop` returns system-level properties the app cannot read at runtime (hidden API restriction, see §2.1); use it only as ground truth for fixture construction, never as app input. Fixtures must be built from what `Build.*` + best-effort `ro.*` actually return in-app, otherwise parser tests pass against inputs the production app can never produce.
+2. Replay the known public OTA request shape against the live endpoint from a test harness or the app, using the real device profile. If the replay returns an unexpected schema or the request shape itself is wrong, fall back to MITM capture (`mitmproxy`/`HttpToolkit`) or manually constructing the request from documented field semantics; do not ship a parser built on an unverified shape.
+3. Record one successful package-found response for the first supported chain as ground truth. No-update and error fixtures are synthetic (derived from the observed schema) and must be labeled `synthetic-*` in the fixture directory — parser branches exercised only against synthetic fixtures are not proven against real server behavior.
+4. Scrub any IMEI/serial from captured or replayed requests before committing fixtures (see §10).
+5. Commit redacted fixtures under `core-ota/src/test/resources/fixtures/` as canonical parser inputs. Filenames must encode provenance: `real-<chain>-success.*`, `synthetic-<chain>-noupdate.*`, etc.
+6. Update §1.1/§1.2 host and field tables in this spec from the verified chain, flipping ❓ → ✅ only for fields proven by a real response.
+
+MITM with `mitmproxy`/`HttpToolkit`, a system CA, or root-level packet tracing is optional evidence, not a v0.1 blocker. Modern Android system clients may reject user CAs or use tighter trust policy, so implementation must not depend on MITM access — but it remains the fallback when step 2 replay fails.
 
 ## 2. Device Detection Signals
 
@@ -108,17 +111,17 @@ The lookup is only as good as the profile it sends. Detection must run on first 
 
 ### 2.1 Signal Inventory
 
-All signals below are readable **without root** via `Build.*` constants or reflection on `android.os.SystemProperties` (the `getprop` keys surface through reflection; wrap in a single `SystemPropertiesAccessor` so it can be faked in tests).
+Use `Build.*` constants as the stable no-root baseline. `android.os.SystemProperties` reflection and shell-style `getprop` keys are best-effort providers because hidden API policy can vary by Android version and vendor build. Wrap every property source behind a single `DevicePropertyProvider` so failures can be faked in tests and never crash the app.
 
 | Field | Source | Root needed | Notes |
 |---|---|---|---|
 | Model name / codename | `Build.MODEL`, `Build.PRODUCT` | No | |
-| Marketing name | `ro.oppo.market.name` ❓ / `ro.product.marketname` ❓ | No (reflection) | Confirm key for current OPlus builds |
-| OxygenOS/ColorOS version | `ro.build.version.ota` ✅, `ro.oppo.version` ❓, `ro.build.version.opporom` ❓ | No (reflection) | Try in order; first non-empty wins |
+| Marketing name | `ro.oppo.market.name` ❓ / `ro.product.marketname` ❓ | No, best effort | Confirm key for current OPlus builds |
+| OxygenOS/ColorOS version | `ro.build.version.ota` ✅, `ro.oppo.version` ❓, `ro.build.version.opporom` ❓ | No, best effort | Try in order; first non-empty wins |
 | Build display string | `Build.DISPLAY` | No | Source of `otaVersion` |
 | Android version | `Build.VERSION.RELEASE` / `SDK_INT` | No | |
 | Security patch | `Build.VERSION.SECURITY_PATCH` | No | Display only |
-| Region | `ro.oppo.region` ❓, SIM MCC, locale | No | See §2.2 |
+| Region | `ro.oppo.region` ❓, SIM MCC, locale | No, best effort | See §2.2 |
 | Serial | `Build.getSerial()` | Requires READ_PRIVILEGED_PHONE_STATS on API 26+ | Treat as optional; never required |
 
 ### 2.2 Region Inference Order
@@ -133,8 +136,10 @@ Resolve region with the first non-empty hit:
 
 ### 2.3 Detection Robustness
 
-- Any `SystemProperties` reflection failure must degrade silently to `Build.*` constants, never crash.
-- If the OxygenOS/ColorOS version key is empty, mark the profile `incomplete` and block lookup until the user enters a manual build string.
+- Any hidden property lookup failure must degrade silently to `Build.*` constants, never crash, and mark the affected profile field as `unknown`.
+- **Expected product reality:** on most Android 9+ non-root devices, hidden API policy blocks `ro.build.version.ota` and friends, so the OxygenOS/ColorOS version will frequently be `unknown`. Do not design the UI around auto-detection succeeding; treat manual build-string entry as the primary path and auto-detection as a convenience.
+- Attempt to recover the version from `Build.DISPLAY` string parsing first (where the display embeds the build id, e.g. `..._11.0.2.2.LE28AA`-style strings) before prompting the user. Parsing is best-effort and must not block on format mismatches.
+- If the version is still empty after `Build.DISPLAY` parsing, mark the profile `incomplete` and block lookup until the user enters a manual build string.
 - Detection runs on a background dispatcher; the dashboard shows a brief "detecting…" skeleton, never a blank screen.
 
 ## 3. Download and Storage Design
@@ -152,7 +157,7 @@ Final ZIPs go to **`MediaStore.Downloads`** (external, user-visible in the syste
 
 - On Android 10+ use the scoped `MediaStore` write path with `RELATIVE_PATH = Environment.DIRECTORY_DOWNLOADS/<AppName>`.
 - On API 28 and below, fall back to `Environment.getExternalStoragePublicDirectory(DOWNLOADS)/<AppName>` with the legacy storage permission.
-- Temp file lives in **app-specific external cache** (`context.cacheDir`), never on shared storage, so partial downloads are not visible to the user or other apps. Temp filename = `<taskId>.zip.part`.
+- Temp file lives in **app-specific external storage** (`context.externalCacheDir` when available, otherwise `getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)`). Use internal `context.cacheDir` only as a last-resort fallback for small test downloads, not for multi-GB OTA packages. Partial downloads must never be written directly to shared Downloads. Temp filename = `<taskId>.zip.part`.
 
 ### 3.3 Range Resume Persistence
 
@@ -181,31 +186,32 @@ On resume:
 ### 3.5 Download State Machine
 
 ```
-                         ┌─────────────┐
-            enqueue ────▶│   Queued    │
-                         └──────┬──────┘
-                                │ start
-                         ┌──────▼──────┐
-              ┌──────────│   Running   │──────────┐
-              │          └──────┬──────┘          │
-              │ pause           │ complete        │ cancel
-       ┌──────▼─────┐    ┌──────▼──────┐   ┌──────▼─────┐
-       │   Paused   │    │  Verifying  │   │ Canceled   │
-       └──────┬─────┘    └──────┬──────┘   └────────────┘
-              │ resume          │ ok              │
-              │            ┌────▼────┐            │
-              │            │Verified │            │
-              │            └─────────┘            │
-              │                                   │
-       ┌──────▼──────┐   network/error ┌──────────▼─────┐
-       │  Retrying   │◀────────────────│     Failed     │
-       └─────────────┘                 └────────────────┘
+   Queued ──start──▶ Running ──pause──▶ Paused
+                       │ ▲                 │
+                       │ └── resume ───────┘
+                       │
+             ┌─────────┼──────────┐
+         cancel      complete   error(retriable)
+             │           │          │
+             ▼           ▼          ▼
+         Canceled    Verifying    Failed
+         (terminal)    │ │          │
+                    ok │ │ mismatch │ no retries left
+                       ▼ │          ▼
+                   Verified    Failed (terminal)
+                   (terminal)     │
+                                  │ retriable + backoff
+                                  ▼
+                               Retrying ──retry──▶ Running
 ```
 
 Rules:
-- `Failed` → `Retrying` only if the error category is retriable (network/server, not file/storage). After N=3 retries, stay `Failed` and surface the reason.
-- `Verifying` is a terminal-ish gate: only `Verified` or `Failed(ChecksumMismatch)`/`Failed(VerifyError)` exit it.
-- `Canceled` deletes `.part` and the Room row on the next idle tick.
+- `Running` → `Paused` (pause); `Paused` → `Running` (resume).
+- `Running` → `Verifying` (complete). `Verifying` → `Verified` (ok, terminal) or → `Failed(ChecksumMismatch)` (mismatch, terminal — do not auto-retry; re-downloading the same URL yields the same bytes, so let the user decide discard vs retry).
+- `Running` → `Failed` (retriable network/server error).
+- `Failed` → `Retrying` only if the error category is retriable (network/server, not file/storage and not checksum mismatch). After N=3 retries, stay `Failed` (terminal) and surface the reason.
+- `Retrying` → `Running` (retry attempt, with backoff).
+- `Queued`/`Running`/`Paused` → `Canceled` (user cancel). `Canceled` is terminal and deletes `.part` + the Room row on the next idle tick.
 - Every transition persists to Room before notifying the UI, so process death always observes a recoverable state.
 
 ### 3.6 Temp File Hygiene
@@ -308,7 +314,7 @@ The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver
 
 ## 13. Engineering Baseline
 
-- **minSdk 26** (covers ~98% of active OPlus devices; Android 8.0 is the practical floor for current OxygenOS/ColorOS), **targetSdk 35**.
+- **minSdk 26** (Android 8.0 as the practical floor for current OxygenOS/ColorOS devices; exact coverage share to be confirmed before release), **targetSdk 35**.
 - **Kotlin 2.0.x**, **Jetpack Compose BOM** latest stable, **AGP 8.x**, **JDK 17**.
 - Build variants: `debug` (verbose logs, no R8), `release` (R8 full mode, obfuscation on, signed via a keystore stored outside the repo).
 - Lint and `detekt` run in CI; new code must be clean.
@@ -322,7 +328,7 @@ The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver
 
 Done when:
 - [ ] Device detection (§2) fills a profile on a real OnePlus and a real OPPO device.
-- [ ] Lookup returns a `PackageFound` against a captured fixture and against the live OPlus endpoint for at least one region.
+- [ ] Lookup returns a `PackageFound` against a real captured fixture (§1.5) for the first supported chain. Live-endpoint verification for at least one region is a stretch goal, not a v0.1 blocker: if the §1.5 replay cannot reach the live endpoint, ship on fixture tests and track live verification as a v0.2 task.
 - [ ] A full ZIP downloads end-to-end with resume after a forced network drop, and is promoted to `MediaStore.Downloads`.
 - [ ] Checksum verification passes on a known-good package and fails (explicitly) on a tampered one.
 - [ ] All §11 unit and MockWebServer integration tests green.
@@ -333,6 +339,7 @@ Done when:
 - [ ] Manual profile mode accepts overrides, validates fields, and round-trips a lookup.
 - [ ] History list persists lookups and downloads across process death; lazy list scrolls smoothly with 100+ entries.
 - [ ] Region/host override exposed in advanced (progressive disclosure) section.
+- [ ] Live-endpoint verification for at least one region (carried over from v0.1 if deferred).
 
 ### v0.3 — Release candidate polish
 
