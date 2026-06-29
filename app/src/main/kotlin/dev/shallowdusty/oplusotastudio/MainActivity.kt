@@ -23,9 +23,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import dev.shallowdusty.oplusotastudio.feature.downloads.DownloadsScreen
+import dev.shallowdusty.oplusotastudio.feature.downloads.DownloadsViewModel
 import dev.shallowdusty.oplusotastudio.feature.lookup.LookupScreen
 import dev.shallowdusty.oplusotastudio.feature.lookup.LookupViewModel
-import dev.shallowdusty.oplusotastudio.ui.PlaceholderScreen
 import dev.shallowdusty.oplusotastudio.ui.theme.OtaStudioTheme
 
 class MainActivity : ComponentActivity() {
@@ -100,8 +101,11 @@ private fun OtaStudioApp() {
                     .let { it as OtaStudioApplication }.graph
                 LookupScreen(factory = { LookupViewModel(graph.deviceDetector, graph.otaLookupService) })
             }
-            // TODO feature-downloads: replace PlaceholderScreen with DownloadsScreen.
-            composable(Dest.Downloads.route) { PlaceholderScreen("Downloads") }
+            composable(Dest.Downloads.route) {
+                val graph = androidx.compose.ui.platform.LocalContext.current.applicationContext
+                    .let { it as OtaStudioApplication }.graph
+                DownloadsScreen(factory = { DownloadsViewModel(graph.downloadEngine) })
+            }
         }
     }
 }
