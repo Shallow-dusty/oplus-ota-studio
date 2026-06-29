@@ -6,8 +6,11 @@ import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
+import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
+import java.io.RandomAccessFile
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
@@ -28,24 +31,30 @@ class SimpleDownloadEngine(
     private val checksumVerifier: ChecksumVerifier = ChecksumVerifier(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val taskStore: DownloadTaskStore? = null,
+    private val resumeRequestPlanner: ResumeRequestPlanner = ResumeRequestPlanner(),
+    private val idGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : DownloadEngine {
 
     private val tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
 
     override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
         tempRoot.mkdirs()
-        val taskId = UUID.randomUUID().toString()
-        val tempFile = tempRoot.resolve("$taskId.zip.part")
-        taskStore?.createQueuedTask(
-            taskId = taskId,
-            pkg = pkg,
-            tempFilePath = tempFile.path,
-            updatedAtMs = nowMs(),
-        )
+        val taskId = idGenerator()
+        val storedTask = taskStore?.getTask(taskId)
+        val tempFile = storedTask?.tempFilePath?.let(::File) ?: tempRoot.resolve("$taskId.zip.part")
+        if (storedTask == null) {
+            taskStore?.createQueuedTask(
+                taskId = taskId,
+                pkg = pkg,
+                tempFilePath = tempFile.path,
+                updatedAtMs = nowMs(),
+            )
+        }
         val task = SimpleDownloadTask(
             taskId = taskId,
             pkg = pkg,
             tempFile = tempFile,
+            storedTask = storedTask,
         )
         tasks.value = tasks.value + task
         task.start()
@@ -58,6 +67,7 @@ class SimpleDownloadEngine(
         override val taskId: String,
         val pkg: OtaPackage,
         val tempFile: File,
+        val storedTask: StoredDownloadTask?,
     ) : DownloadTask {
         private val _state = MutableStateFlow<DownloadState>(DownloadState.Queued)
         override val state: Flow<DownloadState> = _state.asStateFlow()
@@ -86,10 +96,17 @@ class SimpleDownloadEngine(
 
         private suspend fun runDownload() {
             try {
-                val request = Request.Builder()
+                val resumePlan = storedTask?.resumePlan(tempFile)
+                if (resumePlan?.discardPartial == true) {
+                    tempFile.delete()
+                }
+                resumePlan?.truncateToBytes?.let { tempFile.truncateTo(it) }
+                val rangeStart = resumePlan?.rangeStart?.takeIf { it > 0L }
+                val requestBuilder = Request.Builder()
                     .url(pkg.downloadUrl)
                     .get()
-                    .build()
+                rangeStart?.let { requestBuilder.header("Range", "bytes=$it-") }
+                val request = requestBuilder.build()
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         updateState(
@@ -113,11 +130,15 @@ class SimpleDownloadEngine(
 
                     val targetSize = pkg.sizeBytes.takeIf { it > 0 }
                         ?: response.header("Content-Length")?.toLongOrNull()
-                    var downloaded = 0L
+                    val appendPartial = rangeStart != null && response.code == 206
+                    if (rangeStart != null && !appendPartial) {
+                        tempFile.delete()
+                    }
+                    var downloaded = if (appendPartial) rangeStart else 0L
                     updateState(DownloadState.Running(downloaded, targetSize, null))
 
                     response.body.byteStream().use { input ->
-                        tempFile.outputStream().use { output ->
+                        FileOutputStream(tempFile, appendPartial).use { output ->
                             val buffer = ByteArray(1024 * 1024)
                             while (coroutineContext.isActive) {
                                 val read = input.read(buffer)
@@ -165,7 +186,32 @@ class SimpleDownloadEngine(
                 updatedAtMs = nowMs(),
             )
         }
+
+        private fun StoredDownloadTask.resumePlan(tempFile: File): ResumeRequestPlan? {
+            if (!tempFile.exists() || tempFile.length() <= 0L) return null
+            val downloadedBytes = when (val current = state) {
+                is DownloadState.Running -> current.downloadedBytes
+                else -> tempFile.length()
+            }
+            return resumeRequestPlanner.plan(
+                stored = ResumeSnapshot(
+                    acceptRanges = acceptRanges,
+                    downloadedBytes = downloadedBytes,
+                    partFileBytes = tempFile.length(),
+                    etag = etag,
+                    lastModified = lastModified,
+                ),
+                current = ResumeValidators(
+                    etag = etag,
+                    lastModified = lastModified,
+                ),
+            )
+        }
     }
 
     private fun nowMs(): Long = System.currentTimeMillis()
+
+    private fun File.truncateTo(bytes: Long) {
+        RandomAccessFile(this, "rw").use { it.setLength(bytes) }
+    }
 }

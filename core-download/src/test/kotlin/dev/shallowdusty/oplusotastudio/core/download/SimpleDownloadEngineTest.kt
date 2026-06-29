@@ -159,6 +159,59 @@ class SimpleDownloadEngineTest {
         )
     }
 
+    @Test
+    fun `resumes existing partial file with range request`() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 206,
+                body = "c",
+                headers = Headers.Builder()
+                    .add("ETag", "\"abc\"")
+                    .add("Accept-Ranges", "bytes")
+                    .build(),
+            ),
+        )
+        server.start()
+        val tempRoot = testTempRoot("range-resume")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        tempFile.writeText("ab")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = "\"abc\"",
+                    lastModified = null,
+                    acceptRanges = true,
+                    state = DownloadState.Running(2L, 3L, null),
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            idGenerator = { "task-1" },
+        )
+
+        val task = engine.enqueue(pkg)
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Verified }
+        }
+
+        assertEquals("bytes=2-", server.takeRequest().headers["Range"])
+        assertEquals("abc", tempFile.readText())
+    }
+
     private fun samplePackage(
         url: String,
         md5: String,
@@ -196,7 +249,9 @@ class SimpleDownloadEngineTest {
         val acceptRanges: Boolean,
     )
 
-    private class RecordingDownloadTaskStore : DownloadTaskStore {
+    private class RecordingDownloadTaskStore(
+        private val existingTasks: Map<String, StoredDownloadTask> = emptyMap(),
+    ) : DownloadTaskStore {
         val created = mutableListOf<CreatedTask>()
         val updates = mutableListOf<StateUpdate>()
         val resumeMetadata = mutableListOf<ResumeMetadataUpdate>()
@@ -228,7 +283,7 @@ class SimpleDownloadEngineTest {
             resumeMetadata += ResumeMetadataUpdate(taskId, etag, lastModified, acceptRanges)
         }
 
-        override suspend fun getTask(taskId: String): StoredDownloadTask? = null
+        override suspend fun getTask(taskId: String): StoredDownloadTask? = existingTasks[taskId]
 
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
     }
