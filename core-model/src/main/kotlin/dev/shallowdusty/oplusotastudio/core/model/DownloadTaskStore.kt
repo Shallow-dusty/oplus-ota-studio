@@ -25,5 +25,13 @@ interface DownloadTaskStore {
         updatedAtMs: Long,
     )
 
+    suspend fun updateResumeMetadata(
+        taskId: String,
+        etag: String?,
+        lastModified: String?,
+        acceptRanges: Boolean,
+        updatedAtMs: Long,
+    )
+
     fun observeTasks(): Flow<List<StoredDownloadTask>>
 }

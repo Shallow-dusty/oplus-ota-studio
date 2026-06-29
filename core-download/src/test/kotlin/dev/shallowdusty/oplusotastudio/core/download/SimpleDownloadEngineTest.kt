@@ -165,6 +165,14 @@ class SimpleDownloadEngineTest {
             updates += StateUpdate(taskId, state)
         }
 
+        override suspend fun updateResumeMetadata(
+            taskId: String,
+            etag: String?,
+            lastModified: String?,
+            acceptRanges: Boolean,
+            updatedAtMs: Long,
+        ) = Unit
+
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
     }
 }

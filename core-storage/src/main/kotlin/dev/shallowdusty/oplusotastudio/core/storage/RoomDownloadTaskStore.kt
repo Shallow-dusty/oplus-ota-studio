@@ -35,6 +35,24 @@ class RoomDownloadTaskStore(
         downloadTaskDao.upsert(current.withState(state, updatedAtMs))
     }
 
+    override suspend fun updateResumeMetadata(
+        taskId: String,
+        etag: String?,
+        lastModified: String?,
+        acceptRanges: Boolean,
+        updatedAtMs: Long,
+    ) {
+        val current = downloadTaskDao.get(taskId) ?: return
+        downloadTaskDao.upsert(
+            current.copy(
+                etag = etag,
+                lastModified = lastModified,
+                acceptRanges = acceptRanges,
+                updatedAtMs = updatedAtMs,
+            ),
+        )
+    }
+
     override fun observeTasks(): Flow<List<StoredDownloadTask>> =
         downloadTaskDao.observeAll().map { rows ->
             rows.map { it.toStoredDownloadTask() }

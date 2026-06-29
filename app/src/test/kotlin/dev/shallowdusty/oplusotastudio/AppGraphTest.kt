@@ -95,6 +95,14 @@ class AppGraphTest {
             updatedAtMs: Long,
         ) = Unit
 
+        override suspend fun updateResumeMetadata(
+            taskId: String,
+            etag: String?,
+            lastModified: String?,
+            acceptRanges: Boolean,
+            updatedAtMs: Long,
+        ) = Unit
+
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
     }
 }

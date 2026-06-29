@@ -64,6 +64,39 @@ class RoomDownloadTaskStoreTest {
     }
 
     @Test
+    fun `updateResumeMetadata rewrites validator fields and preserves state`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ).withState(
+                state = DownloadState.Running(128L, 1024L, 64L),
+                updatedAtMs = 150L,
+            ),
+        )
+
+        store.updateResumeMetadata(
+            taskId = "task-1",
+            etag = "\"abc\"",
+            lastModified = "Tue, 30 Jun 2026 00:00:00 GMT",
+            acceptRanges = true,
+            updatedAtMs = 200L,
+        )
+
+        val saved = dao.upserts.single()
+        assertEquals("\"abc\"", saved.etag)
+        assertEquals("Tue, 30 Jun 2026 00:00:00 GMT", saved.lastModified)
+        assertEquals(true, saved.acceptRanges)
+        assertEquals("Running", saved.state)
+        assertEquals(128L, saved.downloadedBytes)
+        assertEquals(200L, saved.updatedAtMs)
+    }
+
+    @Test
     fun `observeTasks maps entities to stored download tasks`() = runTest {
         val dao = FakeDownloadTaskDao()
         val store = RoomDownloadTaskStore(dao)
