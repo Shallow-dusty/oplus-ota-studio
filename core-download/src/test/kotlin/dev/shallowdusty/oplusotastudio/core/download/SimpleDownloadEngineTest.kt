@@ -160,6 +160,40 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `promotes verified file and records final path`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val promoter = RecordingDownloadFilePromoter("content://downloads/pkg.zip")
+        val tempRoot = testTempRoot("promoted")
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            filePromoter = promoter,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = "900150983cd24fb0d6963f7d28e17f72",
+            ),
+        )
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Verified }
+        }
+
+        assertEquals(task.taskId, promoter.promotions.single().taskId)
+        assertEquals(tempRoot.resolve("${task.taskId}.zip.part"), promoter.promotions.single().sourceFile)
+        assertEquals(
+            FinalPathUpdate(task.taskId, "content://downloads/pkg.zip"),
+            store.finalPaths.single(),
+        )
+    }
+
+    @Test
     fun `resumes existing partial file with range request`() = runTest {
         server.enqueue(
             MockResponse(
@@ -357,12 +391,38 @@ class SimpleDownloadEngineTest {
         val acceptRanges: Boolean,
     )
 
+    private data class FinalPathUpdate(
+        val taskId: String,
+        val finalFilePath: String,
+    )
+
+    private data class Promotion(
+        val taskId: String,
+        val sourceFile: File,
+    )
+
+    private class RecordingDownloadFilePromoter(
+        private val finalPath: String,
+    ) : DownloadFilePromoter {
+        val promotions = mutableListOf<Promotion>()
+
+        override suspend fun promote(
+            taskId: String,
+            pkg: OtaPackage,
+            sourceFile: File,
+        ): PromotedDownloadFile {
+            promotions += Promotion(taskId, sourceFile)
+            return PromotedDownloadFile(finalPath)
+        }
+    }
+
     private class RecordingDownloadTaskStore(
         private val existingTasks: Map<String, StoredDownloadTask> = emptyMap(),
     ) : DownloadTaskStore {
         val created = mutableListOf<CreatedTask>()
         val updates = mutableListOf<StateUpdate>()
         val resumeMetadata = mutableListOf<ResumeMetadataUpdate>()
+        val finalPaths = mutableListOf<FinalPathUpdate>()
 
         override suspend fun createQueuedTask(
             taskId: String,
@@ -395,7 +455,9 @@ class SimpleDownloadEngineTest {
             taskId: String,
             finalFilePath: String,
             updatedAtMs: Long,
-        ) = Unit
+        ) {
+            finalPaths += FinalPathUpdate(taskId, finalFilePath)
+        }
 
         override suspend fun getTask(taskId: String): StoredDownloadTask? = existingTasks[taskId]
 

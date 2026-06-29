@@ -32,6 +32,7 @@ class SimpleDownloadEngine(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val taskStore: DownloadTaskStore? = null,
     private val resumeRequestPlanner: ResumeRequestPlanner = ResumeRequestPlanner(),
+    private val filePromoter: DownloadFilePromoter? = null,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : DownloadEngine {
 
@@ -154,7 +155,7 @@ class SimpleDownloadEngine(
                 }
 
                 updateState(DownloadState.Verifying)
-                updateState(when (
+                when (
                     val result = checksumVerifier.verify(
                         file = tempFile,
                         expectedSha256 = pkg.sha256,
@@ -162,13 +163,17 @@ class SimpleDownloadEngine(
                     )
                 ) {
                     is ChecksumResult.Verified,
-                    ChecksumResult.Unverified -> DownloadState.Verified
+                    ChecksumResult.Unverified -> {
+                        promoteVerifiedFile()
+                        updateState(DownloadState.Verified)
+                    }
                     is ChecksumResult.Mismatch -> DownloadState.Failed(
                         category = OtaErrorCategory.ChecksumMismatch,
                         retriesRemaining = 0,
                         raw = "expected ${result.expectedHash}, got ${result.actualHash} (${result.algorithm.name})",
                     )
-                })
+                        .let { updateState(it) }
+                }
             } catch (error: IOException) {
                 updateState(
                     DownloadState.Failed(
@@ -185,6 +190,19 @@ class SimpleDownloadEngine(
             taskStore?.updateState(
                 taskId = taskId,
                 state = state,
+                updatedAtMs = nowMs(),
+            )
+        }
+
+        private suspend fun promoteVerifiedFile() {
+            val promoted = filePromoter?.promote(
+                taskId = taskId,
+                pkg = pkg,
+                sourceFile = tempFile,
+            ) ?: return
+            taskStore?.updateFinalFilePath(
+                taskId = taskId,
+                finalFilePath = promoted.finalFilePath,
                 updatedAtMs = nowMs(),
             )
         }
