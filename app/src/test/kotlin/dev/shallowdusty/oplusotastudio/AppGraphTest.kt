@@ -1,6 +1,8 @@
 package dev.shallowdusty.oplusotastudio
 
+import dev.shallowdusty.oplusotastudio.core.download.SimpleDownloadEngine
 import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
+import java.io.File
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Test
 
@@ -11,5 +13,12 @@ class AppGraphTest {
         val graph = AppGraph()
 
         assertInstanceOf(LegacyOtaLookupService::class.java, graph.otaLookupService)
+    }
+
+    @Test
+    fun `uses real download engine when temp root is provided`() {
+        val graph = AppGraph(downloadTempRoot = File("build/tmp/app-graph-test"))
+
+        assertInstanceOf(SimpleDownloadEngine::class.java, graph.downloadEngine)
     }
 }
