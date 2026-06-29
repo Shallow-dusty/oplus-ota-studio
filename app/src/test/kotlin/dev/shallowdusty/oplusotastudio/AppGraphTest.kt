@@ -1,14 +1,20 @@
 package dev.shallowdusty.oplusotastudio
 
 import dev.shallowdusty.oplusotastudio.core.download.SimpleDownloadEngine
+import dev.shallowdusty.oplusotastudio.core.model.DownloadState
+import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
+import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
+import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
 import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertInstanceOf
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
 
@@ -36,6 +42,28 @@ class AppGraphTest {
     }
 
     @Test
+    fun `passes supplied download task store to real download engine`() = runTest {
+        val store = RecordingDownloadTaskStore()
+        val graph = AppGraph(
+            downloadTempRoot = File("build/tmp/app-graph-store-test"),
+            downloadTaskStore = store,
+        )
+
+        val task = graph.downloadEngine.enqueue(
+            OtaPackage(
+                versionName = "test",
+                type = "full",
+                sizeBytes = 3L,
+                sourceHost = "127.0.0.1",
+                downloadUrl = "http://127.0.0.1:1/pkg.zip",
+                md5 = null,
+            ),
+        )
+
+        assertEquals(task.taskId, store.created.single())
+    }
+
+    @Test
     fun `uses supplied package repository`() {
         val repository = RecordingPackageRepository()
         val graph = AppGraph(packageRepository = repository)
@@ -47,5 +75,26 @@ class AppGraphTest {
         override suspend fun record(entry: HistoryEntry) = Unit
 
         override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(emptyList())
+    }
+
+    private class RecordingDownloadTaskStore : DownloadTaskStore {
+        val created = mutableListOf<String>()
+
+        override suspend fun createQueuedTask(
+            taskId: String,
+            pkg: OtaPackage,
+            tempFilePath: String,
+            updatedAtMs: Long,
+        ) {
+            created += taskId
+        }
+
+        override suspend fun updateState(
+            taskId: String,
+            state: DownloadState,
+            updatedAtMs: Long,
+        ) = Unit
+
+        override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
     }
 }

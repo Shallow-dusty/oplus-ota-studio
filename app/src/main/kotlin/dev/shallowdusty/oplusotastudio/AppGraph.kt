@@ -2,6 +2,7 @@ package dev.shallowdusty.oplusotastudio
 
 import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
+import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.download.SimpleDownloadEngine
@@ -24,13 +25,14 @@ import java.io.File
 class AppGraph(
     private val downloadTempRoot: File? = null,
     val packageRepository: PackageRepository = FakePackageRepository(),
+    private val downloadTaskStore: DownloadTaskStore? = null,
 ) {
     val deviceDetector: DeviceDetector = AndroidDeviceDetector()
     val otaLookupService: OtaLookupService = LegacyOtaLookupService(
         transport = OkHttpOtaTransport(),
     )
     val downloadEngine: DownloadEngine = downloadTempRoot
-        ?.let { SimpleDownloadEngine(tempRoot = it) }
+        ?.let { SimpleDownloadEngine(tempRoot = it, taskStore = downloadTaskStore) }
         ?: FakeDownloadEngine()
 
     companion object {

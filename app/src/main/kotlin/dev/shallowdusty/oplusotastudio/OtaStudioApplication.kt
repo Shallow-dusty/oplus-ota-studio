@@ -2,6 +2,7 @@ package dev.shallowdusty.oplusotastudio
 
 import android.app.Application
 import dev.shallowdusty.oplusotastudio.core.storage.OtaStudioDatabase
+import dev.shallowdusty.oplusotastudio.core.storage.RoomDownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.storage.RoomPackageRepository
 import dev.shallowdusty.oplusotastudio.core.storage.createOtaStudioDatabase
 
@@ -14,6 +15,7 @@ class OtaStudioApplication : Application() {
         AppGraph(
             downloadTempRoot = externalCacheDir ?: cacheDir,
             packageRepository = RoomPackageRepository(database.historyDao()),
+            downloadTaskStore = RoomDownloadTaskStore(database.downloadTaskDao()),
         )
     }
 }
