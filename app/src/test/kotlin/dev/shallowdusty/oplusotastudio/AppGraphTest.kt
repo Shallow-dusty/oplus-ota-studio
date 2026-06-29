@@ -1,5 +1,7 @@
 package dev.shallowdusty.oplusotastudio
 
+import dev.shallowdusty.oplusotastudio.core.download.DownloadFilePromoter
+import dev.shallowdusty.oplusotastudio.core.download.PromotedDownloadFile
 import dev.shallowdusty.oplusotastudio.core.download.SimpleDownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
@@ -64,6 +66,21 @@ class AppGraphTest {
     }
 
     @Test
+    fun `passes supplied download file promoter to real download engine`() {
+        val promoter = NoOpDownloadFilePromoter()
+        val graph = AppGraph(
+            downloadTempRoot = File("build/tmp/app-graph-promoter-test"),
+            downloadFilePromoter = promoter,
+        )
+
+        val engine = assertInstanceOf(SimpleDownloadEngine::class.java, graph.downloadEngine)
+        val field = SimpleDownloadEngine::class.java.getDeclaredField("filePromoter")
+            .apply { isAccessible = true }
+
+        assertSame(promoter, field.get(engine))
+    }
+
+    @Test
     fun `uses supplied package repository`() {
         val repository = RecordingPackageRepository()
         val graph = AppGraph(packageRepository = repository)
@@ -75,6 +92,14 @@ class AppGraphTest {
         override suspend fun record(entry: HistoryEntry) = Unit
 
         override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(emptyList())
+    }
+
+    private class NoOpDownloadFilePromoter : DownloadFilePromoter {
+        override suspend fun promote(
+            taskId: String,
+            pkg: OtaPackage,
+            sourceFile: File,
+        ): PromotedDownloadFile = PromotedDownloadFile(sourceFile.absolutePath)
     }
 
     private class RecordingDownloadTaskStore : DownloadTaskStore {

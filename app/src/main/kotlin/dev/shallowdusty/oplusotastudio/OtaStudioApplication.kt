@@ -5,6 +5,7 @@ import dev.shallowdusty.oplusotastudio.core.storage.OtaStudioDatabase
 import dev.shallowdusty.oplusotastudio.core.storage.RoomDownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.storage.RoomPackageRepository
 import dev.shallowdusty.oplusotastudio.core.storage.createOtaStudioDatabase
+import dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoter
 
 class OtaStudioApplication : Application() {
     private val database: OtaStudioDatabase by lazy {
@@ -16,6 +17,7 @@ class OtaStudioApplication : Application() {
             downloadTempRoot = externalCacheDir ?: cacheDir,
             packageRepository = RoomPackageRepository(database.historyDao()),
             downloadTaskStore = RoomDownloadTaskStore(database.downloadTaskDao()),
+            downloadFilePromoter = AndroidMediaStoreDownloadFilePromoter(this),
         )
     }
 }
