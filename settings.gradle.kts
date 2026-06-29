@@ -22,4 +22,9 @@ dependencyResolutionManagement {
 
 rootProject.name = "oplus-ota-studio"
 
-// Module includes are added in the module-graph commit (see spec §14 v0.0).
+// Frontend modules (v0.0). Backend modules core-ota / core-download / core-storage
+// will be included by codex once they land.
+include(":app")
+include(":core-model")
+include(":feature-lookup")
+include(":feature-downloads")
