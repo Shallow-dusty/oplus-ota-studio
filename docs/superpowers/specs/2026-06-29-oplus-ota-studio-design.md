@@ -1,8 +1,10 @@
-# OPlus OTA Studio Design
+# OPlus OTA Studio Design and Delivery Plan
 
 ## Goal
 
 Build a new mobile-first OTA utility for OPlus/OnePlus devices. The first version runs entirely on the phone and covers device detection, OTA profile setup, package lookup, download, resume, verification, and clear status feedback. A later PC companion can use ADB to automate setup and export logs, but it is not part of the first build.
+
+This document is both the product design and the delivery source of truth. If a requirement below cannot be implemented, tested, or evidenced in a small revertable commit, split it into a smaller milestone before coding.
 
 ## Product Boundary
 
@@ -26,6 +28,32 @@ The app is split into focused modules:
 
 Keep the domain layer Android-light where practical so the OTA parser, download state machine, and checksum logic can be unit-tested without an emulator.
 
+## Delivery Rules
+
+### Evidence Levels
+
+Protocol and device claims must be labeled with the strongest evidence currently available:
+
+- **live-verified**: the app or a test harness successfully queried a current OPlus/OnePlus endpoint from a real device/network profile.
+- **captured-real**: a real device request/response was captured from device or system-client traffic and redacted into a committed fixture.
+- **replayed-real-profile**: a locally constructed request using real device facts returned a plausible response, but capture parity is not fully proven.
+- **synthetic**: fixture or behavior was generated from the known schema to exercise code paths; useful for tests, not proof of live server behavior.
+
+v0.1 may ship on `captured-real` / `replayed-real-profile` parser evidence if live endpoint access is blocked, but the app UI must disclose that live lookup support is experimental until at least one `live-verified` chain exists.
+
+### Execution Shape
+
+The project should be implemented in small, rollback-safe slices:
+
+1. Bootstrap the repo and Android scaffold.
+2. Land domain models and pure JVM tests before Android UI.
+3. Land protocol fixtures and parser tests before live networking UI.
+4. Land the download state machine before WorkManager and notifications.
+5. Land storage promotion tests before exposing final "save to Downloads" actions.
+6. Land UI screens after their state models are test-covered.
+
+Each slice should compile and test independently. Do not batch unrelated scaffold, feature, and documentation changes into one commit; follow `AGENTS.md` for staging and commit granularity.
+
 ## 1. OTA Protocol Contract
 
 > **Verification status convention.** This section is a *reference contract* distilled from publicly observable OPlus/OnePlus OTA behavior. Field names and paths marked ✅ are well-established from public research; those marked ❓ must be confirmed by on-device packet capture during implementation week 1 before being relied on. Treat the contract as the code/test skeleton, not as ground truth until verified.
@@ -46,7 +74,7 @@ The app should resolve the target host from the detected region, never hard-code
 
 ### 1.2 Request Contract (reference)
 
-OPlus services have shipped both a legacy XML/form style (OnePlus lineage) and a newer JSON style (ColorOS lineage). The architecture must support multiple protocol strategies, but v0.1 only has to ship the first strategy verified against a real device and live endpoint. Prefer the OnePlus 9 Pro CN / ColorOS chain we already have access to; keep the other style as a testable strategy stub until captures or replay data prove the contract.
+OPlus services have shipped both a legacy XML/form style (OnePlus lineage) and a newer JSON style (ColorOS lineage). The architecture must support multiple protocol strategies, but v0.1 only has to ship one enabled strategy backed by `captured-real`, `replayed-real-profile`, or `live-verified` evidence. Prefer the OnePlus 9 Pro CN / ColorOS chain we already have access to; keep the other style as a disabled, testable strategy stub until captures or replay data prove the contract.
 
 **Style A — OnePlus XML/form (legacy OxygenOS):**
 
@@ -94,13 +122,13 @@ sealed interface OtaLookupResult {
 
 ### 1.5 Week-1 Verification Protocol
 
-Before writing `core-ota` parsing logic against fixtures, establish at least one ground-truth chain:
+Before enabling a `core-ota` protocol strategy in the app, establish at least one ground-truth chain:
 
 1. Collect local device facts with `adb shell getprop`, Android `Build.*`, and the current OTA/build strings. **Provenance note:** `getprop` returns system-level properties the app cannot read at runtime (hidden API restriction, see §2.1); use it only as ground truth for fixture construction, never as app input. Fixtures must be built from what `Build.*` + best-effort `ro.*` actually return in-app, otherwise parser tests pass against inputs the production app can never produce.
-2. Replay the known public OTA request shape against the live endpoint from a test harness or the app, using the real device profile. If the replay returns an unexpected schema or the request shape itself is wrong, fall back to MITM capture (`mitmproxy`/`HttpToolkit`) or manually constructing the request from documented field semantics; do not ship a parser built on an unverified shape.
-3. Record one successful package-found response for the first supported chain as ground truth. No-update and error fixtures are synthetic (derived from the observed schema) and must be labeled `synthetic-*` in the fixture directory — parser branches exercised only against synthetic fixtures are not proven against real server behavior.
+2. Replay the known public OTA request shape against the live endpoint from a test harness or the app, using the real device profile. If the replay returns an unexpected schema or the request shape itself is wrong, fall back to MITM capture (`mitmproxy`/`HttpToolkit`) or manually constructing the request from documented field semantics.
+3. Record one successful package-found response for the first supported chain as ground truth. If live replay is blocked but a real captured response exists, v0.1 may continue with fixture-backed lookup and must track live endpoint verification as a v0.2 blocker. No-update and error fixtures are synthetic (derived from the observed schema) and must be labeled `synthetic-*` in the fixture directory — parser branches exercised only against synthetic fixtures are not proven against real server behavior.
 4. Scrub any IMEI/serial from captured or replayed requests before committing fixtures (see §10).
-5. Commit redacted fixtures under `core-ota/src/test/resources/fixtures/` as canonical parser inputs. Filenames must encode provenance: `real-<chain>-success.*`, `synthetic-<chain>-noupdate.*`, etc.
+5. Commit redacted fixtures under `core-ota/src/test/resources/fixtures/` as canonical parser inputs. Filenames must encode provenance: `captured-real-<chain>-success.*`, `replayed-real-profile-<chain>-success.*`, `synthetic-<chain>-noupdate.*`, etc.
 6. Update §1.1/§1.2 host and field tables in this spec from the verified chain, flipping ❓ → ✅ only for fields proven by a real response.
 
 MITM with `mitmproxy`/`HttpToolkit`, a system CA, or root-level packet tracing is optional evidence, not a v0.1 blocker. Modern Android system clients may reject user CAs or use tighter trust policy, so implementation must not depend on MITM access — but it remains the fallback when step 2 replay fails.
@@ -158,6 +186,7 @@ Final ZIPs go to **`MediaStore.Downloads`** (external, user-visible in the syste
 - On Android 10+ use the scoped `MediaStore` write path with `RELATIVE_PATH = Environment.DIRECTORY_DOWNLOADS/<AppName>`.
 - On API 28 and below, fall back to `Environment.getExternalStoragePublicDirectory(DOWNLOADS)/<AppName>` with the legacy storage permission.
 - Temp file lives in **app-specific external storage** (`context.externalCacheDir` when available, otherwise `getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)`). Use internal `context.cacheDir` only as a last-resort fallback for small test downloads, not for multi-GB OTA packages. Partial downloads must never be written directly to shared Downloads. Temp filename = `<taskId>.zip.part`.
+- Before enqueueing a multi-GB download, estimate available bytes in the selected temp root and target Downloads volume. If temp and final storage share a volume, require `targetSize * 2 + 1 GiB` free to allow copy/promote plus cleanup; if they differ, require `targetSize + 1 GiB` free on each involved volume.
 
 ### 3.3 Range Resume Persistence
 
@@ -172,7 +201,7 @@ Persist per-task state in Room (`download_task` table):
 - `targetSize: Long?`, `md5?`, `sha256?`
 
 On resume:
-1. If `acceptRanges == true` AND the server still returns the same `ETag`/`Last-Modified` for a `HEAD` (or the first range `GET` returns `206`), send `Range: bytes=<downloadedBytes>-` and append to `.part`.
+1. If `acceptRanges == true` AND the server still returns the same `ETag`/`Last-Modified` for a `HEAD` (or the first range `GET` returns `206` when `HEAD` is unsupported), send `Range: bytes=<downloadedBytes>-` and append to `.part`.
 2. If `acceptRanges == false` or the etag changed, discard `.part` and restart from 0. Surface "server changed package, restarting" as the reason.
 3. Verify `.part` size matches `downloadedBytes` before resuming; if larger (interrupted double-write), truncate to `downloadedBytes`.
 
@@ -216,7 +245,7 @@ Rules:
 
 ### 3.6 Temp File Hygiene
 
-- On app start, scan `cacheDir` for `*.zip.part` with no matching Room task (orphaned) and delete them.
+- On app start, scan every configured temp root (`externalCacheDir`, `getExternalFilesDir(DOWNLOADS)`, and internal `cacheDir` fallback) for `*.zip.part` with no matching Room task (orphaned) and delete them.
 - On low-storage warning (`ComponentCallbacks2.onTrimMemory(TRIM_MEMORY_RUNNING_LOW_CRITICAL)`), do not delete active `.part` files, but reject new enqueues.
 - Keep a cap on total queue size (default 20 tasks) to bound storage use.
 
@@ -291,17 +320,17 @@ Every failed lookup or download should expose a compact reason and a details vie
 - **Transport:** HTTPS only. Disable cleartext to OTA hosts via `networkSecurityConfig`. Certificate pinning is deferred (pins would need capture and break on host rotation); rely on system trust for v1.
 - **Storage:** downloaded ZIPs go to public Downloads; the app does not read or modify other files there.
 - **Trademark & naming:** "OPlus", "OnePlus", "OxygenOS", "ColorOS" are trademarks. App name, package id, and store listing must not imply official affiliation. Recommended package id: `dev.shallowdusty.oplusotastudio` (neutral). No OPlus logo/assets in the app.
-- **License:** Apache-2.0 for the codebase. Fixture data derived from real OTA responses must be redacted and is not redistributable as-is.
+- **License:** Apache-2.0 for the codebase. Fixture data derived from real OTA responses must be reduced to the minimum parser input, redacted before commit, and kept out of public releases until reviewed for tokens, signed URLs, PII, and redistribution risk.
 
 ## 11. Testing Strategy
 
-Use TDD for behavior-heavy code:
+Use TDD for behavior-heavy code. The default verification ladder is pure JVM first, fake HTTP second, emulator/device only where Android platform behavior matters:
 
 - Unit tests for OTA profile normalization and request payload generation (Style A and Style B).
 - Unit tests for OTA response parsing with successful, no-update, malformed, and missing-field fixtures (redacted captures from §1.5).
 - Unit tests for download state transitions (full state machine in §3.5), resume header calculation, etag-change discard, file promotion rules, and checksum mismatch.
 - Integration tests with a fake `MockWebServer` covering: full download + verify, resume after disconnect, server-side package change, and checksum mismatch.
-- Instrumentation tests for storage promotion to `MediaStore.Downloads` across API 26/29/34.
+- Instrumentation tests for storage promotion to `MediaStore.Downloads` across API 26/29/34. CI runs API 29/34 first; API 26 may be local-only until emulator stability is proven, but its command and result must be recorded before v0.1 is called done.
 - UI tests for lookup state rendering and primary download interactions after the core flows exist; add Compose screenshot tests for each state in §6.
 
 The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver`) and local temp files over mocks where possible.
@@ -314,8 +343,9 @@ The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver
 
 ## 13. Engineering Baseline
 
-- **minSdk 26** (Android 8.0 as the practical floor for current OxygenOS/ColorOS devices; exact coverage share to be confirmed before release), **targetSdk 35**.
-- **Kotlin 2.0.x**, **Jetpack Compose BOM** latest stable, **AGP 8.x**, **JDK 17**.
+- **minSdk 26** (Android 8.0 as the practical floor for current OxygenOS/ColorOS devices; exact coverage share to be confirmed before release), **targetSdk 36 preferred / 35 minimum**. Google Play currently requires new phone apps and updates to target Android 15 / API 35 or higher from August 31, 2025; Android 16 / API 36 is the migration target when dependencies and emulator images are stable.
+- **Default scaffold baseline:** Kotlin `2.4.0`, AGP `9.2.1`, Gradle `9.6.1`, JDK `17`, SDK Build Tools `36.0.0`, Compose BOM pinned in `libs.versions.toml`.
+- **Fallback baseline if AGP 9.2 or Kotlin 2.4 blocks Compose/Room/KSP stability:** Kotlin `2.2.21`, AGP `8.13.x`, JDK `17`, targetSdk `35`. If the fallback is used, open a `docs:` follow-up to record why and when to retry the modern baseline.
 - Build variants: `debug` (verbose logs, no R8), `release` (R8 full mode, obfuscation on, signed via a keystore stored outside the repo).
 - Lint and `detekt` run in CI; new code must be clean.
 - **CI:** GitHub Actions matrix (unit tests on JVM, instrumentation on API 29/34 emulators via `reactivecircus/android-emulator-runner`). Block merges on red unit tests; instrumentation is informational until stable.
@@ -324,14 +354,25 @@ The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver
 
 ## 14. Milestones and Acceptance Criteria
 
+### v0.0 — Revertable foundation
+
+Done when:
+- [ ] Repo has Apache-2.0 `LICENSE`, `README.md` pointing to this spec, `.gitignore`, version catalog, Gradle wrapper, and CI skeleton.
+- [ ] Android project compiles with the selected §13 baseline and contains the planned modules with empty but buildable source sets.
+- [ ] `core-model` defines `OtaProfile`, `OtaPackage`, `OtaLookupResult`, `DownloadState`, and error categories with pure JVM tests.
+- [ ] `core-download` has a pure Kotlin state machine test suite for every transition in §3.5 before WorkManager exists.
+- [ ] CI runs `./gradlew test lint detekt` or the closest available scaffold equivalent.
+- [ ] Every bootstrap concern lands as a separate commit: license/readme, Gradle scaffold, module graph, CI, first domain tests.
+
 ### v0.1 — Core MVP (lookup + download + verify)
 
 Done when:
-- [ ] Device detection (§2) fills a profile on a real OnePlus and a real OPPO device.
-- [ ] Lookup returns a `PackageFound` against a real captured fixture (§1.5) for the first supported chain. Live-endpoint verification for at least one region is a stretch goal, not a v0.1 blocker: if the §1.5 replay cannot reach the live endpoint, ship on fixture tests and track live verification as a v0.2 task.
+- [ ] Device detection (§2) fills a best-effort profile on one real OnePlus/OPlus device and one second profile source (real OPPO device preferred; emulator/manual profile acceptable only if clearly labeled).
+- [ ] Lookup returns a `PackageFound` through one enabled strategy backed by `captured-real`, `replayed-real-profile`, or `live-verified` evidence (§1.5). If not `live-verified`, the UI marks live lookup as experimental and v0.2 carries the live verification blocker.
 - [ ] A full ZIP downloads end-to-end with resume after a forced network drop, and is promoted to `MediaStore.Downloads`.
 - [ ] Checksum verification passes on a known-good package and fails (explicitly) on a tampered one.
-- [ ] All §11 unit and MockWebServer integration tests green.
+- [ ] All §11 unit and MockWebServer integration tests green; storage promotion is verified on API 29/34 CI or locally, and API 26 has a recorded local result or documented emulator blocker.
+- [ ] Release copy, details view, and logs do not imply the app verifies OPlus package signatures; v0.1 verifies transfer integrity only.
 
 ### v0.2 — Profile control + history
 
@@ -339,7 +380,7 @@ Done when:
 - [ ] Manual profile mode accepts overrides, validates fields, and round-trips a lookup.
 - [ ] History list persists lookups and downloads across process death; lazy list scrolls smoothly with 100+ entries.
 - [ ] Region/host override exposed in advanced (progressive disclosure) section.
-- [ ] Live-endpoint verification for at least one region (carried over from v0.1 if deferred).
+- [ ] Live-endpoint verification for at least one region is complete. This is mandatory for v0.2 if v0.1 shipped on fixture-backed evidence.
 
 ### v0.3 — Release candidate polish
 
@@ -348,6 +389,7 @@ Done when:
 - [ ] Error categories in §8 all have user-facing copy and a details view.
 - [ ] Local logging + export (§9) wired to the details view.
 - [ ] R8 release build installs and runs; CI green on emulator matrix.
+- [ ] Public release readiness review passes: naming/trademark, privacy disclosure, fixture redistribution, screenshots, and branch protection.
 
 ### Future
 
@@ -361,6 +403,12 @@ The PC companion should be treated as a second product surface, not a dependency
 
 ## Repository Setup
 
-Create the local project at `E:\coding\oplus-ota-studio`.
+The local project already lives at `E:\coding\oplus-ota-studio`, with GitHub remote `Shallow-dusty/oplus-ota-studio`. Keep the repository private until the app has a working first release candidate (v0.3).
 
-Create a GitHub repository named `oplus-ota-studio` under the `Shallow-dusty` account. Start private until the app has a working first release candidate (v0.3). The repository should contain the spec, implementation plan, Android project, tests, and later release artifacts. Add an `Apache-2.0` LICENSE, a `README` pointing to this spec, a `.github/workflows/` CI pipeline per §13, and branch protection on `main` (require PR review + green CI).
+Before regular feature work begins, finish the v0.0 bootstrap checklist:
+
+1. Add `LICENSE` and `README.md` in one docs/setup commit.
+2. Add Gradle wrapper, settings, version catalog, and empty module graph in one build commit.
+3. Add CI skeleton in one `ci:` commit.
+4. Add first domain model + state machine tests in focused `feat:` / `test:` commits.
+5. Configure branch protection on `main` once CI exists: require PR review and green required checks.
