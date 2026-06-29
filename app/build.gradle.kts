@@ -34,6 +34,7 @@ dependencies {
     implementation(project(":feature-lookup"))
     implementation(project(":feature-downloads"))
     implementation(project(":core-model"))
+    implementation(project(":core-download"))
     implementation(project(":core-ota"))
 
     implementation(platform(libs.androidx.compose.bom))
