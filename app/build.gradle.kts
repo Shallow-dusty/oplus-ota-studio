@@ -36,6 +36,7 @@ dependencies {
     implementation(project(":core-model"))
     implementation(project(":core-download"))
     implementation(project(":core-ota"))
+    implementation(project(":core-storage"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
