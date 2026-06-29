@@ -427,6 +427,70 @@ class SimpleDownloadEngineTest {
         assertEquals("abc", tempFile.readText())
     }
 
+    @Test
+    fun `restarts from zero when resumed response validators changed`() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 206,
+                body = "c",
+                headers = Headers.Builder()
+                    .add("ETag", "\"new\"")
+                    .add("Accept-Ranges", "bytes")
+                    .build(),
+            ),
+        )
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body = "abc",
+                headers = Headers.Builder()
+                    .add("ETag", "\"new\"")
+                    .add("Accept-Ranges", "bytes")
+                    .build(),
+            ),
+        )
+        server.start()
+        val tempRoot = testTempRoot("range-validator-changed")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        tempFile.writeText("ab")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = "\"old\"",
+                    lastModified = null,
+                    acceptRanges = true,
+                    state = DownloadState.Running(2L, 3L, null),
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            idGenerator = { "task-1" },
+        )
+
+        val task = engine.enqueue(pkg)
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Verified }
+        }
+
+        assertEquals("bytes=2-", server.takeRequest().headers["Range"])
+        assertEquals(null, server.takeRequest().headers["Range"])
+        assertEquals("abc", tempFile.readText())
+    }
+
     private fun samplePackage(
         url: String,
         md5: String,

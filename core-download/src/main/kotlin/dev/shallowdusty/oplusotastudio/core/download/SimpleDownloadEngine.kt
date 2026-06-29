@@ -24,6 +24,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 
 class SimpleDownloadEngine(
     private val client: OkHttpClient = OkHttpClient(),
@@ -120,6 +121,16 @@ class SimpleDownloadEngine(
                 var rangeStart = resumePlan?.rangeStart?.takeIf { it > 0L }
                 var response = client.newCall(buildRequest(rangeStart)).execute()
                 if (rangeStart != null && response.code == 416) {
+                    response.close()
+                    tempFile.delete()
+                    rangeStart = null
+                    response = client.newCall(buildRequest(rangeStart)).execute()
+                }
+                if (
+                    rangeStart != null &&
+                    response.code == 206 &&
+                    storedTask?.validatorsChanged(response) == true
+                ) {
                     response.close()
                     tempFile.delete()
                     rangeStart = null
@@ -267,6 +278,18 @@ class SimpleDownloadEngine(
                     lastModified = lastModified,
                 ),
             )
+        }
+
+        private fun StoredDownloadTask.validatorsChanged(response: Response): Boolean {
+            val responseEtag = response.header("ETag")
+            val responseLastModified = response.header("Last-Modified")
+            val etagChanged = etag != null &&
+                responseEtag != null &&
+                etag != responseEtag
+            val lastModifiedChanged = lastModified != null &&
+                responseLastModified != null &&
+                lastModified != responseLastModified
+            return etagChanged || lastModifiedChanged
         }
     }
 
