@@ -121,6 +121,30 @@ class RoomDownloadTaskStoreTest {
         assertEquals(200L, tasks.single().updatedAtMs)
     }
 
+    @Test
+    fun `getTask maps resume metadata to stored download task`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ).copy(
+                etag = "\"abc\"",
+                lastModified = "Tue, 30 Jun 2026 00:00:00 GMT",
+                acceptRanges = true,
+            ),
+        )
+
+        val task = store.getTask("task-1")
+
+        assertEquals("\"abc\"", task?.etag)
+        assertEquals("Tue, 30 Jun 2026 00:00:00 GMT", task?.lastModified)
+        assertEquals(true, task?.acceptRanges)
+    }
+
     private fun samplePackage(): OtaPackage =
         OtaPackage(
             versionName = "14.0.0.1901",

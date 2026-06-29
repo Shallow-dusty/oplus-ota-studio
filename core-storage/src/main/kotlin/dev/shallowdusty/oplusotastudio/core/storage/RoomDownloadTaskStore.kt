@@ -53,6 +53,9 @@ class RoomDownloadTaskStore(
         )
     }
 
+    override suspend fun getTask(taskId: String): StoredDownloadTask? =
+        downloadTaskDao.get(taskId)?.toStoredDownloadTask()
+
     override fun observeTasks(): Flow<List<StoredDownloadTask>> =
         downloadTaskDao.observeAll().map { rows ->
             rows.map { it.toStoredDownloadTask() }
@@ -74,6 +77,9 @@ private fun DownloadTaskEntity.toStoredDownloadTask(): StoredDownloadTask =
         ),
         tempFilePath = tempFilePath,
         finalFilePath = finalFilePath,
+        etag = etag,
+        lastModified = lastModified,
+        acceptRanges = acceptRanges,
         state = toDownloadState(),
         updatedAtMs = updatedAtMs,
     )

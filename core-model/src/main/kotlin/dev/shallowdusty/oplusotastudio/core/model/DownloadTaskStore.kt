@@ -7,6 +7,9 @@ data class StoredDownloadTask(
     val pkg: OtaPackage,
     val tempFilePath: String,
     val finalFilePath: String?,
+    val etag: String?,
+    val lastModified: String?,
+    val acceptRanges: Boolean,
     val state: DownloadState,
     val updatedAtMs: Long,
 )
@@ -32,6 +35,8 @@ interface DownloadTaskStore {
         acceptRanges: Boolean,
         updatedAtMs: Long,
     )
+
+    suspend fun getTask(taskId: String): StoredDownloadTask?
 
     fun observeTasks(): Flow<List<StoredDownloadTask>>
 }
