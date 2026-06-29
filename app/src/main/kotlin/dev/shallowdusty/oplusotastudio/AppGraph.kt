@@ -4,9 +4,10 @@ import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
+import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
+import dev.shallowdusty.oplusotastudio.core.ota.OkHttpOtaTransport
 import dev.shallowdusty.oplusotastudio.fake.FakeDeviceDetector
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadEngine
-import dev.shallowdusty.oplusotastudio.fake.FakeOtaLookupService
 import dev.shallowdusty.oplusotastudio.fake.FakePackageRepository
 
 /**
@@ -20,7 +21,9 @@ import dev.shallowdusty.oplusotastudio.fake.FakePackageRepository
  */
 class AppGraph {
     val deviceDetector: DeviceDetector = FakeDeviceDetector()
-    val otaLookupService: OtaLookupService = FakeOtaLookupService()
+    val otaLookupService: OtaLookupService = LegacyOtaLookupService(
+        transport = OkHttpOtaTransport(),
+    )
     val downloadEngine: DownloadEngine = FakeDownloadEngine()
     val packageRepository: PackageRepository = FakePackageRepository()
 
