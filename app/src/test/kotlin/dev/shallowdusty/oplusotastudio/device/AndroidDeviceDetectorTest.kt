@@ -1,0 +1,66 @@
+package dev.shallowdusty.oplusotastudio.device
+
+import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+class AndroidDeviceDetectorTest {
+
+    @Test
+    fun `builds device profile from build facts and best effort properties`() = runTest {
+        val detector = AndroidDeviceDetector(
+            buildFactsProvider = {
+                AndroidBuildFacts(
+                    model = "LE2120",
+                    product = "OnePlus9Pro_CH",
+                    display = "LE2120_11.H.23_0001_000000000001",
+                    androidVersion = "14",
+                    securityPatch = "2026-06-05",
+                )
+            },
+            propertyProvider = MapDevicePropertyProvider(
+                "ro.oppo.market.name" to "OnePlus 9 Pro",
+                "ro.build.version.ota" to "LE2120_11.H.23_0001_000000000001",
+                "ro.oppo.region" to "CN",
+            ),
+            localeCountryProvider = { "US" },
+        )
+
+        val profile = detector.detect()
+
+        assertEquals("LE2120", profile.model)
+        assertEquals("OnePlus9Pro_CH", profile.product)
+        assertEquals("OnePlus 9 Pro", profile.marketingName)
+        assertEquals("LE2120_11.H.23_0001_000000000001", profile.otaVersion)
+        assertEquals("14", profile.androidVersion)
+        assertEquals("2026-06-05", profile.securityPatch)
+        assertEquals(OtaRegion.China, profile.region)
+        assertFalse(profile.incomplete)
+    }
+
+    @Test
+    fun `marks profile incomplete when OTA version cannot be resolved`() = runTest {
+        val detector = AndroidDeviceDetector(
+            buildFactsProvider = {
+                AndroidBuildFacts(
+                    model = "LE2120",
+                    product = "OnePlus9Pro_CH",
+                    display = "unknown",
+                    androidVersion = "14",
+                    securityPatch = null,
+                )
+            },
+            propertyProvider = MapDevicePropertyProvider(),
+            localeCountryProvider = { "US" },
+        )
+
+        val profile = detector.detect()
+
+        assertEquals(null, profile.otaVersion)
+        assertEquals(OtaRegion.Global, profile.region)
+        assertTrue(profile.incomplete)
+    }
+}
