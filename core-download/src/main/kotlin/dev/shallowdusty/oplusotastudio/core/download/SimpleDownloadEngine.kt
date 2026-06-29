@@ -102,6 +102,15 @@ class SimpleDownloadEngine(
                         return
                     }
 
+                    taskStore?.updateResumeMetadata(
+                        taskId = taskId,
+                        etag = response.header("ETag"),
+                        lastModified = response.header("Last-Modified"),
+                        acceptRanges = response.header("Accept-Ranges")
+                            ?.equals("bytes", ignoreCase = true) == true,
+                        updatedAtMs = nowMs(),
+                    )
+
                     val targetSize = pkg.sizeBytes.takeIf { it > 0 }
                         ?: response.header("Content-Length")?.toLongOrNull()
                     var downloaded = 0L

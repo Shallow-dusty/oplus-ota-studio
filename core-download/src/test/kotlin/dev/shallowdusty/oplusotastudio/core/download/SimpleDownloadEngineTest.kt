@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import okhttp3.Headers
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -114,6 +115,50 @@ class SimpleDownloadEngineTest {
         assertEquals(DownloadState.Verified, store.updates.last().state)
     }
 
+    @Test
+    fun `persists resume metadata from response headers`() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body = "abc",
+                headers = Headers.Builder()
+                    .add("ETag", "\"abc\"")
+                    .add("Last-Modified", "Tue, 30 Jun 2026 00:00:00 GMT")
+                    .add("Accept-Ranges", "bytes")
+                    .build(),
+            ),
+        )
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("resume-metadata"),
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = "900150983cd24fb0d6963f7d28e17f72",
+            ),
+        )
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Verified }
+        }
+
+        assertEquals(
+            ResumeMetadataUpdate(
+                taskId = task.taskId,
+                etag = "\"abc\"",
+                lastModified = "Tue, 30 Jun 2026 00:00:00 GMT",
+                acceptRanges = true,
+            ),
+            store.resumeMetadata.single(),
+        )
+    }
+
     private fun samplePackage(
         url: String,
         md5: String,
@@ -144,9 +189,17 @@ class SimpleDownloadEngineTest {
         val state: DownloadState,
     )
 
+    private data class ResumeMetadataUpdate(
+        val taskId: String,
+        val etag: String?,
+        val lastModified: String?,
+        val acceptRanges: Boolean,
+    )
+
     private class RecordingDownloadTaskStore : DownloadTaskStore {
         val created = mutableListOf<CreatedTask>()
         val updates = mutableListOf<StateUpdate>()
+        val resumeMetadata = mutableListOf<ResumeMetadataUpdate>()
 
         override suspend fun createQueuedTask(
             taskId: String,
@@ -171,7 +224,9 @@ class SimpleDownloadEngineTest {
             lastModified: String?,
             acceptRanges: Boolean,
             updatedAtMs: Long,
-        ) = Unit
+        ) {
+            resumeMetadata += ResumeMetadataUpdate(taskId, etag, lastModified, acceptRanges)
+        }
 
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
     }
