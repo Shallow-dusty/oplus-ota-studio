@@ -194,6 +194,45 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `fails before network request when storage preflight fails`() = runTest {
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("storage-preflight"),
+            scope = backgroundScope,
+            taskStore = store,
+            storageSnapshotProvider = {
+                DownloadStorageSnapshot(
+                    tempAvailableBytes = 1L,
+                    finalAvailableBytes = 1L,
+                    tempAndFinalShareVolume = true,
+                )
+            },
+        )
+
+        val task = engine.enqueue(
+            OtaPackage(
+                versionName = "test",
+                type = "full",
+                sizeBytes = 3L,
+                sourceHost = "127.0.0.1",
+                downloadUrl = "http://127.0.0.1:1/pkg.zip",
+                md5 = "900150983cd24fb0d6963f7d28e17f72",
+            ),
+        )
+
+        val finalState = withTimeout(5.seconds) {
+            task.state.first { it is DownloadState.Failed }
+        }
+
+        val failed = finalState as DownloadState.Failed
+        assertEquals(OtaErrorCategory.File, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertTrue(failed.raw?.contains("Download requires") == true)
+        assertEquals(failed, store.updates.last().state)
+    }
+
+    @Test
     fun `resumes existing partial file with range request`() = runTest {
         server.enqueue(
             MockResponse(

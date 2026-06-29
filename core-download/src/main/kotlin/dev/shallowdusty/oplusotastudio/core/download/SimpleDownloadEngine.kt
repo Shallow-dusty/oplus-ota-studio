@@ -33,6 +33,8 @@ class SimpleDownloadEngine(
     private val taskStore: DownloadTaskStore? = null,
     private val resumeRequestPlanner: ResumeRequestPlanner = ResumeRequestPlanner(),
     private val filePromoter: DownloadFilePromoter? = null,
+    private val storagePreflight: DownloadStoragePreflight = DownloadStoragePreflight(),
+    private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : DownloadEngine {
 
@@ -97,6 +99,17 @@ class SimpleDownloadEngine(
 
         private suspend fun runDownload() {
             try {
+                storagePreflightFailure()?.let { failure ->
+                    updateState(
+                        DownloadState.Failed(
+                            category = OtaErrorCategory.File,
+                            retriesRemaining = 0,
+                            raw = failure.reason,
+                        ),
+                    )
+                    return
+                }
+
                 val resumePlan = storedTask?.resumePlan(tempFile)
                 if (resumePlan?.discardPartial == true) {
                     tempFile.delete()
@@ -205,6 +218,14 @@ class SimpleDownloadEngine(
                 finalFilePath = promoted.finalFilePath,
                 updatedAtMs = nowMs(),
             )
+        }
+
+        private fun storagePreflightFailure(): DownloadStoragePreflightResult.Failed? {
+            val snapshotProvider = storageSnapshotProvider ?: return null
+            return storagePreflight.check(
+                packageSizeBytes = pkg.sizeBytes,
+                snapshot = snapshotProvider(),
+            ) as? DownloadStoragePreflightResult.Failed
         }
 
         private fun buildRequest(rangeStart: Long?): Request {
