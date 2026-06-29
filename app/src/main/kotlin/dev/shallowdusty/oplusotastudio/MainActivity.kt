@@ -99,7 +99,15 @@ private fun OtaStudioApp() {
             composable(Dest.Lookup.route) {
                 val graph = androidx.compose.ui.platform.LocalContext.current.applicationContext
                     .let { it as OtaStudioApplication }.graph
-                LookupScreen(factory = { LookupViewModel(graph.deviceDetector, graph.otaLookupService) })
+                LookupScreen(
+                    factory = {
+                        LookupViewModel(
+                            deviceDetector = graph.deviceDetector,
+                            lookupService = graph.otaLookupService,
+                            downloadEngine = graph.downloadEngine,
+                        )
+                    },
+                )
             }
             composable(Dest.Downloads.route) {
                 val graph = androidx.compose.ui.platform.LocalContext.current.applicationContext

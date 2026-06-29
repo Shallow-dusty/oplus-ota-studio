@@ -60,7 +60,11 @@ fun LookupScreen(
                 LookupUiState.Detecting -> DetectingContent()
                 is LookupUiState.Ready -> ReadyContent(s, viewModel::lookup, viewModel::updateProfile)
                 LookupUiState.Querying -> QueryingContent()
-                is LookupUiState.PackageFound -> PackageFoundContent(s.pkg, viewModel::reset)
+                is LookupUiState.PackageFound -> PackageFoundContent(
+                    pkg = s.pkg,
+                    onDownload = viewModel::enqueueDownload,
+                    onReset = viewModel::reset,
+                )
                 LookupUiState.NoUpdate -> NoUpdateContent(viewModel::reset)
                 is LookupUiState.Error -> ErrorContent(s, viewModel::reset)
             }
@@ -166,7 +170,11 @@ private fun SummaryRow(label: String, value: String?) {
 }
 
 @Composable
-private fun PackageFoundContent(pkg: dev.shallowdusty.oplusotastudio.core.model.OtaPackage, onReset: () -> Unit) {
+private fun PackageFoundContent(
+    pkg: dev.shallowdusty.oplusotastudio.core.model.OtaPackage,
+    onDownload: (dev.shallowdusty.oplusotastudio.core.model.OtaPackage) -> Unit,
+    onReset: () -> Unit,
+) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -185,6 +193,9 @@ private fun PackageFoundContent(pkg: dev.shallowdusty.oplusotastudio.core.model.
             Text(notes, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(16.dp))
+        Button(onClick = { onDownload(pkg) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Download package")
+        }
         OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
             Text("Back to lookup")
         }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DeviceProfile
+import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
@@ -48,6 +49,7 @@ sealed interface LookupUiState {
 class LookupViewModel(
     private val deviceDetector: DeviceDetector,
     private val lookupService: OtaLookupService,
+    private val downloadEngine: DownloadEngine? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LookupUiState>(LookupUiState.Detecting)
@@ -105,6 +107,13 @@ class LookupViewModel(
     /** Reset from a terminal result (PackageFound/NoUpdate/Error) back to Ready. */
     fun reset() {
         lastReady?.let { _uiState.value = it }
+    }
+
+    fun enqueueDownload(pkg: OtaPackage) {
+        val engine = downloadEngine ?: return
+        viewModelScope.launch {
+            engine.enqueue(pkg)
+        }
     }
 }
 

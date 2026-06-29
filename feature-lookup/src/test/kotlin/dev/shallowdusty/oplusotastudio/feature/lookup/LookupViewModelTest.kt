@@ -2,6 +2,8 @@ package dev.shallowdusty.oplusotastudio.feature.lookup
 
 import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DeviceProfile
+import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
+import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
@@ -9,6 +11,8 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -152,6 +156,22 @@ class LookupViewModelTest {
         assertTrue(vm.uiState.value is LookupUiState.Ready)
     }
 
+    @Test
+    fun `enqueueDownload forwards package to download engine`() = runTest {
+        val engine = RecordingDownloadEngine()
+        val pkg = samplePackage()
+        val vm = LookupViewModel(
+            deviceDetector = FakeDeviceDetector(completeProfile()),
+            lookupService = FakeLookupService(OtaLookupResult.NoUpdate),
+            downloadEngine = engine,
+        )
+
+        vm.enqueueDownload(pkg)
+        advanceUntilIdle()
+
+        assertEquals(listOf(pkg), engine.enqueued)
+    }
+
     private fun completeProfile() = DeviceProfile(
         model = "LE2123",
         product = "OnePlus9Pro",
@@ -187,5 +207,24 @@ class LookupViewModelTest {
 
     private class FakeLookupService(private val result: OtaLookupResult) : OtaLookupService {
         override suspend fun lookup(profile: OtaProfile): OtaLookupResult = result
+    }
+
+    private class RecordingDownloadEngine : DownloadEngine {
+        val enqueued = mutableListOf<OtaPackage>()
+
+        override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
+            enqueued += pkg
+            return object : DownloadTask {
+                override val taskId: String = "recording"
+                override val state: Flow<dev.shallowdusty.oplusotastudio.core.model.DownloadState> =
+                    flowOf(dev.shallowdusty.oplusotastudio.core.model.DownloadState.Queued)
+
+                override suspend fun pause() {}
+                override suspend fun resume() {}
+                override suspend fun cancel() {}
+            }
+        }
+
+        override fun observeAll(): Flow<List<DownloadTask>> = flowOf(emptyList())
     }
 }
