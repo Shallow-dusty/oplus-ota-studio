@@ -23,6 +23,7 @@ import java.io.File
  */
 class AppGraph(
     private val downloadTempRoot: File? = null,
+    val packageRepository: PackageRepository = FakePackageRepository(),
 ) {
     val deviceDetector: DeviceDetector = AndroidDeviceDetector()
     val otaLookupService: OtaLookupService = LegacyOtaLookupService(
@@ -31,7 +32,6 @@ class AppGraph(
     val downloadEngine: DownloadEngine = downloadTempRoot
         ?.let { SimpleDownloadEngine(tempRoot = it) }
         ?: FakeDownloadEngine()
-    val packageRepository: PackageRepository = FakePackageRepository()
 
     companion object {
         @Volatile
