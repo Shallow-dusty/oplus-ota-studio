@@ -1,0 +1,239 @@
+package dev.shallowdusty.oplusotastudio.feature.lookup
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+/**
+ * The lookup screen (spec §5, §6). Renders every [LookupUiState] branch
+ * explicitly so each state has its own copy and layout.
+ *
+ * [factory] lets the app inject a [LookupViewModel] wired to the AppGraph
+ * services; tests construct the ViewModel directly.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LookupScreen(
+    factory: () -> LookupViewModel,
+) {
+    val viewModel: LookupViewModel = viewModel(factory = viewModelFactory { initializer { factory() } })
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("OTA Lookup") }) },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            when (val s = state) {
+                LookupUiState.Detecting -> DetectingContent()
+                is LookupUiState.Ready -> ReadyContent(s, viewModel::lookup, viewModel::updateProfile)
+                LookupUiState.Querying -> QueryingContent()
+                is LookupUiState.PackageFound -> PackageFoundContent(s.pkg, viewModel::reset)
+                LookupUiState.NoUpdate -> NoUpdateContent(viewModel::reset)
+                is LookupUiState.Error -> ErrorContent(s, viewModel::reset)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetectingContent() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(12.dp))
+            Text("Detecting device…", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun QueryingContent() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(12.dp))
+            Text("Querying OTA service…", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun ReadyContent(
+    state: LookupUiState.Ready,
+    onLookup: () -> Unit,
+    onProfileChange: (dev.shallowdusty.oplusotastudio.core.model.OtaProfile) -> Unit,
+) {
+    val profile = state.profile
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (state.device != null) {
+            DeviceSummary(state.device)
+            HorizontalDivider()
+        }
+        Text("Profile", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = profile.model,
+            onValueChange = { onProfileChange(profile.copy(model = it)) },
+            label = { Text("Model") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = profile.otaVersion,
+            onValueChange = { onProfileChange(profile.copy(otaVersion = it)) },
+            label = { Text("OTA version (build string)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(
+            onClick = onLookup,
+            enabled = profile.otaVersion.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Filled.Search, contentDescription = null)
+            Spacer(Modifier.size(8.dp))
+            Text("Look up update")
+        }
+    }
+}
+
+@Composable
+private fun DeviceSummary(device: dev.shallowdusty.oplusotastudio.core.model.DeviceProfile) {
+    Column {
+        Text("Detected device", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        SummaryRow("Model", device.model)
+        SummaryRow("Marketing name", device.marketingName)
+        SummaryRow("OTA version", device.otaVersion)
+        SummaryRow("Android", device.androidVersion)
+        SummaryRow("Region", device.region?.name)
+        if (device.incomplete) {
+            Text(
+                "Detection incomplete — some fields need manual entry.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SummaryRow(label: String, value: String?) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            value ?: "—",
+            style = MaterialTheme.typography.bodyMedium,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun PackageFoundContent(pkg: dev.shallowdusty.oplusotastudio.core.model.OtaPackage, onReset: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Update available", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        SummaryRow("Version", pkg.versionName)
+        SummaryRow("Type", pkg.type)
+        SummaryRow("Size", formatBytes(pkg.sizeBytes))
+        SummaryRow("Source", pkg.sourceHost)
+        SummaryRow("MD5", pkg.md5)
+        SummaryRow("SHA-256", pkg.sha256)
+        val notes = pkg.releaseNotes
+        if (notes != null) {
+            Spacer(Modifier.height(8.dp))
+            Text("Release notes", style = MaterialTheme.typography.titleMedium)
+            Text(notes, style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.height(16.dp))
+        OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
+            Text("Back to lookup")
+        }
+    }
+}
+
+@Composable
+private fun NoUpdateContent(onReset: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Up to date", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        Text("No update is available for this profile.", style = MaterialTheme.typography.bodyMedium)
+        OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text("Back to lookup") }
+    }
+}
+
+@Composable
+private fun ErrorContent(state: LookupUiState.Error, onReset: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Lookup failed", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error)
+        Text(categoryLabel(state.category), style = MaterialTheme.typography.bodyMedium)
+        if (state.raw != null) {
+            Text(
+                state.raw,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text("Back to lookup") }
+    }
+}
+
+private fun categoryLabel(c: dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory): String = when (c) {
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Network -> "Network problem: could not reach the OTA service."
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Server -> "Server problem: the OTA service returned an error."
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Malformed -> "Malformed response: the server reply could not be parsed."
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Device -> "Device/profile problem: check the model and build string."
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.File -> "File problem."
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.ChecksumMismatch -> "Checksum mismatch."
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Unknown -> "Unknown error."
+}
+
+private fun formatBytes(bytes: Long): String {
+    val mb = bytes / 1_000_000.0
+    return if (mb >= 1000) "%.2f GB".format(mb / 1000) else "%.1f MB".format(mb)
+}
