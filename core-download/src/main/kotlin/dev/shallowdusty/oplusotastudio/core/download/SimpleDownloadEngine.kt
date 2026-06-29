@@ -3,6 +3,7 @@ package dev.shallowdusty.oplusotastudio.core.download
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
+import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import java.io.File
@@ -26,6 +27,7 @@ class SimpleDownloadEngine(
     private val tempRoot: File,
     private val checksumVerifier: ChecksumVerifier = ChecksumVerifier(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val taskStore: DownloadTaskStore? = null,
 ) : DownloadEngine {
 
     private val tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
@@ -33,10 +35,17 @@ class SimpleDownloadEngine(
     override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
         tempRoot.mkdirs()
         val taskId = UUID.randomUUID().toString()
+        val tempFile = tempRoot.resolve("$taskId.zip.part")
+        taskStore?.createQueuedTask(
+            taskId = taskId,
+            pkg = pkg,
+            tempFilePath = tempFile.path,
+            updatedAtMs = nowMs(),
+        )
         val task = SimpleDownloadTask(
             taskId = taskId,
             pkg = pkg,
-            tempFile = tempRoot.resolve("$taskId.zip.part"),
+            tempFile = tempFile,
         )
         tasks.value = tasks.value + task
         task.start()
@@ -61,18 +70,18 @@ class SimpleDownloadEngine(
         }
 
         override suspend fun pause() {
-            _state.value = DownloadState.Paused(DownloadState.Paused.PauseReason.User)
+            updateState(DownloadState.Paused(DownloadState.Paused.PauseReason.User))
         }
 
         override suspend fun resume() {
             if (_state.value is DownloadState.Paused) {
-                _state.value = DownloadState.Running(tempFile.length(), pkg.sizeBytes, null)
+                updateState(DownloadState.Running(tempFile.length(), pkg.sizeBytes, null))
             }
         }
 
         override suspend fun cancel() {
             job?.cancel()
-            _state.value = DownloadState.Canceled
+            updateState(DownloadState.Canceled)
         }
 
         private suspend fun runDownload() {
@@ -83,10 +92,12 @@ class SimpleDownloadEngine(
                     .build()
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        _state.value = DownloadState.Failed(
-                            category = OtaErrorCategory.Server,
-                            retriesRemaining = 0,
-                            raw = "HTTP ${response.code}",
+                        updateState(
+                            DownloadState.Failed(
+                                category = OtaErrorCategory.Server,
+                                retriesRemaining = 0,
+                                raw = "HTTP ${response.code}",
+                            ),
                         )
                         return
                     }
@@ -94,7 +105,7 @@ class SimpleDownloadEngine(
                     val targetSize = pkg.sizeBytes.takeIf { it > 0 }
                         ?: response.header("Content-Length")?.toLongOrNull()
                     var downloaded = 0L
-                    _state.value = DownloadState.Running(downloaded, targetSize, null)
+                    updateState(DownloadState.Running(downloaded, targetSize, null))
 
                     response.body.byteStream().use { input ->
                         tempFile.outputStream().use { output ->
@@ -104,14 +115,14 @@ class SimpleDownloadEngine(
                                 if (read == -1) break
                                 output.write(buffer, 0, read)
                                 downloaded += read
-                                _state.value = DownloadState.Running(downloaded, targetSize, null)
+                                updateState(DownloadState.Running(downloaded, targetSize, null))
                             }
                         }
                     }
                 }
 
-                _state.value = DownloadState.Verifying
-                _state.value = when (
+                updateState(DownloadState.Verifying)
+                updateState(when (
                     val result = checksumVerifier.verify(
                         file = tempFile,
                         expectedSha256 = pkg.sha256,
@@ -125,14 +136,27 @@ class SimpleDownloadEngine(
                         retriesRemaining = 0,
                         raw = "expected ${result.expectedHash}, got ${result.actualHash} (${result.algorithm.name})",
                     )
-                }
+                })
             } catch (error: IOException) {
-                _state.value = DownloadState.Failed(
-                    category = OtaErrorCategory.Network,
-                    retriesRemaining = 0,
-                    raw = error.message,
+                updateState(
+                    DownloadState.Failed(
+                        category = OtaErrorCategory.Network,
+                        retriesRemaining = 0,
+                        raw = error.message,
+                    ),
                 )
             }
         }
+
+        private suspend fun updateState(state: DownloadState) {
+            _state.value = state
+            taskStore?.updateState(
+                taskId = taskId,
+                state = state,
+                updatedAtMs = nowMs(),
+            )
+        }
     }
+
+    private fun nowMs(): Long = System.currentTimeMillis()
 }
