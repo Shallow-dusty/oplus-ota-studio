@@ -237,6 +237,43 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `retries server error before verified download`() = runTest {
+        server.enqueue(MockResponse(code = 503, body = "try later"))
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("server-retry"),
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = "900150983cd24fb0d6963f7d28e17f72",
+            ),
+        )
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Verified }
+        }
+
+        assertEquals(2, server.requestCount)
+        assertTrue(
+            store.updates.any {
+                it.state == DownloadState.Retrying(
+                    attempt = 1,
+                    maxAttempts = 3,
+                    category = OtaErrorCategory.Server,
+                )
+            },
+        )
+        assertEquals(DownloadState.Verified, store.updates.last().state)
+    }
+
+    @Test
     fun `cancel deletes part file and removes stored task`() = runTest {
         val store = RecordingDownloadTaskStore()
         val tempRoot = testTempRoot("cancel-cleanup")

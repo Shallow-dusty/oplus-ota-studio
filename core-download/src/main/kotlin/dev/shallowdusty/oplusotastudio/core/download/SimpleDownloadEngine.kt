@@ -7,6 +7,7 @@ import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
+import dev.shallowdusty.oplusotastudio.core.model.isRetriable
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -36,6 +37,7 @@ class SimpleDownloadEngine(
     private val filePromoter: DownloadFilePromoter? = null,
     private val storagePreflight: DownloadStoragePreflight = DownloadStoragePreflight(),
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
+    private val maxAttempts: Int = 3,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : DownloadEngine {
 
@@ -101,115 +103,149 @@ class SimpleDownloadEngine(
         }
 
         private suspend fun runDownload() {
-            try {
-                storagePreflightFailure()?.let { failure ->
-                    updateState(
-                        DownloadState.Failed(
-                            category = OtaErrorCategory.File,
-                            retriesRemaining = 0,
-                            raw = failure.reason,
-                        ),
+            storagePreflightFailure()?.let { failure ->
+                updateState(
+                    DownloadState.Failed(
+                        category = OtaErrorCategory.File,
+                        retriesRemaining = 0,
+                        raw = failure.reason,
+                    ),
+                )
+                return
+            }
+
+            var failedAttempts = 0
+            while (coroutineContext.isActive) {
+                val outcome = try {
+                    runDownloadAttempt()
+                } catch (error: IOException) {
+                    DownloadAttemptOutcome.Failed(
+                        category = OtaErrorCategory.Network,
+                        raw = error.message,
                     )
-                    return
                 }
 
-                val resumePlan = storedTask?.resumePlan(tempFile)
-                if (resumePlan?.discardPartial == true) {
-                    tempFile.delete()
-                }
-                resumePlan?.truncateToBytes?.let { tempFile.truncateTo(it) }
-                var rangeStart = resumePlan?.rangeStart?.takeIf { it > 0L }
-                var response = client.newCall(buildRequest(rangeStart)).execute()
-                if (rangeStart != null && response.code == 416) {
-                    response.close()
-                    tempFile.delete()
-                    rangeStart = null
-                    response = client.newCall(buildRequest(rangeStart)).execute()
-                }
-                if (
-                    rangeStart != null &&
-                    response.code == 206 &&
-                    storedTask?.validatorsChanged(response) == true
-                ) {
-                    response.close()
-                    tempFile.delete()
-                    rangeStart = null
-                    response = client.newCall(buildRequest(rangeStart)).execute()
-                }
-                response.use {
-                    if (!response.isSuccessful) {
-                        updateState(
-                            DownloadState.Failed(
-                                category = OtaErrorCategory.Server,
-                                retriesRemaining = 0,
-                                raw = "HTTP ${response.code}",
-                            ),
-                        )
-                        return
+                when (outcome) {
+                    DownloadAttemptOutcome.Finished -> return
+                    is DownloadAttemptOutcome.Failed -> {
+                        failedAttempts += 1
+                        if (!retryOrFinish(outcome, failedAttempts)) return
                     }
+                }
+            }
+        }
 
-                    taskStore?.updateResumeMetadata(
-                        taskId = taskId,
-                        etag = response.header("ETag"),
-                        lastModified = response.header("Last-Modified"),
-                        acceptRanges = response.header("Accept-Ranges")
-                            ?.equals("bytes", ignoreCase = true) == true,
-                        updatedAtMs = nowMs(),
+        private suspend fun runDownloadAttempt(): DownloadAttemptOutcome {
+            val resumePlan = storedTask?.resumePlan(tempFile)
+            if (resumePlan?.discardPartial == true) {
+                tempFile.delete()
+            }
+            resumePlan?.truncateToBytes?.let { tempFile.truncateTo(it) }
+            var rangeStart = resumePlan?.rangeStart?.takeIf { it > 0L }
+            var response = client.newCall(buildRequest(rangeStart)).execute()
+            if (rangeStart != null && response.code == 416) {
+                response.close()
+                tempFile.delete()
+                rangeStart = null
+                response = client.newCall(buildRequest(rangeStart)).execute()
+            }
+            if (
+                rangeStart != null &&
+                response.code == 206 &&
+                storedTask?.validatorsChanged(response) == true
+            ) {
+                response.close()
+                tempFile.delete()
+                rangeStart = null
+                response = client.newCall(buildRequest(rangeStart)).execute()
+            }
+            response.use {
+                if (!response.isSuccessful) {
+                    return DownloadAttemptOutcome.Failed(
+                        category = OtaErrorCategory.Server,
+                        raw = "HTTP ${response.code}",
                     )
+                }
 
-                    val targetSize = pkg.sizeBytes.takeIf { it > 0 }
-                        ?: response.header("Content-Length")?.toLongOrNull()
-                    val appendPartial = rangeStart != null && response.code == 206
-                    if (rangeStart != null && !appendPartial) {
-                        tempFile.delete()
-                    }
-                    var downloaded = if (appendPartial) rangeStart else 0L
-                    updateState(DownloadState.Running(downloaded, targetSize, null))
+                taskStore?.updateResumeMetadata(
+                    taskId = taskId,
+                    etag = response.header("ETag"),
+                    lastModified = response.header("Last-Modified"),
+                    acceptRanges = response.header("Accept-Ranges")
+                        ?.equals("bytes", ignoreCase = true) == true,
+                    updatedAtMs = nowMs(),
+                )
 
-                    response.body.byteStream().use { input ->
-                        FileOutputStream(tempFile, appendPartial).use { output ->
-                            val buffer = ByteArray(1024 * 1024)
-                            while (coroutineContext.isActive) {
-                                val read = input.read(buffer)
-                                if (read == -1) break
-                                output.write(buffer, 0, read)
-                                downloaded += read
-                                updateState(DownloadState.Running(downloaded, targetSize, null))
-                            }
+                val targetSize = pkg.sizeBytes.takeIf { it > 0 }
+                    ?: response.header("Content-Length")?.toLongOrNull()
+                val appendPartial = rangeStart != null && response.code == 206
+                if (rangeStart != null && !appendPartial) {
+                    tempFile.delete()
+                }
+                var downloaded = if (appendPartial) rangeStart else 0L
+                updateState(DownloadState.Running(downloaded, targetSize, null))
+
+                response.body.byteStream().use { input ->
+                    FileOutputStream(tempFile, appendPartial).use { output ->
+                        val buffer = ByteArray(1024 * 1024)
+                        while (coroutineContext.isActive) {
+                            val read = input.read(buffer)
+                            if (read == -1) break
+                            output.write(buffer, 0, read)
+                            downloaded += read
+                            updateState(DownloadState.Running(downloaded, targetSize, null))
                         }
                     }
                 }
-
-                updateState(DownloadState.Verifying)
-                when (
-                    val result = checksumVerifier.verify(
-                        file = tempFile,
-                        expectedSha256 = pkg.sha256,
-                        expectedMd5 = pkg.md5,
-                    )
-                ) {
-                    is ChecksumResult.Verified,
-                    ChecksumResult.Unverified -> {
-                        promoteVerifiedFile()
-                        updateState(DownloadState.Verified)
-                    }
-                    is ChecksumResult.Mismatch -> DownloadState.Failed(
-                        category = OtaErrorCategory.ChecksumMismatch,
-                        retriesRemaining = 0,
-                        raw = "expected ${result.expectedHash}, got ${result.actualHash} " +
-                            "(${result.algorithm.name}); quarantined at ${quarantineBadFile().path}",
-                    )
-                        .let { updateState(it) }
-                }
-            } catch (error: IOException) {
-                updateState(
-                    DownloadState.Failed(
-                        category = OtaErrorCategory.Network,
-                        retriesRemaining = 0,
-                        raw = error.message,
-                    ),
-                )
             }
+
+            updateState(DownloadState.Verifying)
+            when (
+                val result = checksumVerifier.verify(
+                    file = tempFile,
+                    expectedSha256 = pkg.sha256,
+                    expectedMd5 = pkg.md5,
+                )
+            ) {
+                is ChecksumResult.Verified,
+                ChecksumResult.Unverified -> {
+                    promoteVerifiedFile()
+                    updateState(DownloadState.Verified)
+                }
+                is ChecksumResult.Mismatch -> DownloadState.Failed(
+                    category = OtaErrorCategory.ChecksumMismatch,
+                    retriesRemaining = 0,
+                    raw = "expected ${result.expectedHash}, got ${result.actualHash} " +
+                        "(${result.algorithm.name}); quarantined at ${quarantineBadFile().path}",
+                )
+                    .let { updateState(it) }
+            }
+            return DownloadAttemptOutcome.Finished
+        }
+
+        private suspend fun retryOrFinish(
+            outcome: DownloadAttemptOutcome.Failed,
+            failedAttempts: Int,
+        ): Boolean {
+            val retriesRemaining = (maxAttempts - failedAttempts).coerceAtLeast(0)
+            updateState(
+                DownloadState.Failed(
+                    category = outcome.category,
+                    retriesRemaining = retriesRemaining,
+                    raw = outcome.raw,
+                ),
+            )
+            if (!outcome.category.isRetriable || retriesRemaining <= 0) {
+                return false
+            }
+            updateState(
+                DownloadState.Retrying(
+                    attempt = failedAttempts,
+                    maxAttempts = maxAttempts,
+                    category = outcome.category,
+                ),
+            )
+            return true
         }
 
         private suspend fun updateState(state: DownloadState) {
@@ -298,4 +334,13 @@ class SimpleDownloadEngine(
     private fun File.truncateTo(bytes: Long) {
         RandomAccessFile(this, "rw").use { it.setLength(bytes) }
     }
+}
+
+private sealed interface DownloadAttemptOutcome {
+    data object Finished : DownloadAttemptOutcome
+
+    data class Failed(
+        val category: OtaErrorCategory,
+        val raw: String?,
+    ) : DownloadAttemptOutcome
 }
