@@ -22,4 +22,13 @@ android {
 //   // TODO core-download: implement DownloadEngine
 //   // TODO core-storage: implement PackageRepository
 dependencies {
+    // Flow is used in the DownloadEngine/PackageRepository contracts.
+    implementation(libs.kotlinx.coroutines.android)
+
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }
