@@ -1,7 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- App shell (Application, theme, MainActivity, navigation) lands in the
-         app-shell commit. This manifest is intentionally minimal so the module
-         assembles before any UI code exists. -->
-    <application />
+
+    <application
+        android:name=".OtaStudioApplication"
+        android:label="OPlus OTA Studio"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>
