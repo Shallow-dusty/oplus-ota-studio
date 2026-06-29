@@ -391,6 +391,12 @@ class SimpleDownloadEngineTest {
             resumeMetadata += ResumeMetadataUpdate(taskId, etag, lastModified, acceptRanges)
         }
 
+        override suspend fun updateFinalFilePath(
+            taskId: String,
+            finalFilePath: String,
+            updatedAtMs: Long,
+        ) = Unit
+
         override suspend fun getTask(taskId: String): StoredDownloadTask? = existingTasks[taskId]
 
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())

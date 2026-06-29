@@ -97,6 +97,34 @@ class RoomDownloadTaskStoreTest {
     }
 
     @Test
+    fun `updateFinalFilePath stores promoted file path and preserves verified state`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ).withState(
+                state = DownloadState.Verified,
+                updatedAtMs = 150L,
+            ),
+        )
+
+        store.updateFinalFilePath(
+            taskId = "task-1",
+            finalFilePath = "content://media/external/downloads/42",
+            updatedAtMs = 200L,
+        )
+
+        val saved = dao.upserts.single()
+        assertEquals("content://media/external/downloads/42", saved.finalFilePath)
+        assertEquals("Verified", saved.state)
+        assertEquals(200L, saved.updatedAtMs)
+    }
+
+    @Test
     fun `observeTasks maps entities to stored download tasks`() = runTest {
         val dao = FakeDownloadTaskDao()
         val store = RoomDownloadTaskStore(dao)

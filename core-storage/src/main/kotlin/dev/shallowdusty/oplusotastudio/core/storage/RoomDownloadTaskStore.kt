@@ -53,6 +53,20 @@ class RoomDownloadTaskStore(
         )
     }
 
+    override suspend fun updateFinalFilePath(
+        taskId: String,
+        finalFilePath: String,
+        updatedAtMs: Long,
+    ) {
+        val current = downloadTaskDao.get(taskId) ?: return
+        downloadTaskDao.upsert(
+            current.copy(
+                finalFilePath = finalFilePath,
+                updatedAtMs = updatedAtMs,
+            ),
+        )
+    }
+
     override suspend fun getTask(taskId: String): StoredDownloadTask? =
         downloadTaskDao.get(taskId)?.toStoredDownloadTask()
 

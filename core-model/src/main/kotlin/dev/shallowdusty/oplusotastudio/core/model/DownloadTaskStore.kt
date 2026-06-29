@@ -36,6 +36,12 @@ interface DownloadTaskStore {
         updatedAtMs: Long,
     )
 
+    suspend fun updateFinalFilePath(
+        taskId: String,
+        finalFilePath: String,
+        updatedAtMs: Long,
+    )
+
     suspend fun getTask(taskId: String): StoredDownloadTask?
 
     fun observeTasks(): Flow<List<StoredDownloadTask>>

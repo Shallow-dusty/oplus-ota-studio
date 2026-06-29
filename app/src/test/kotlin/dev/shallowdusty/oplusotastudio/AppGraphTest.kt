@@ -103,6 +103,12 @@ class AppGraphTest {
             updatedAtMs: Long,
         ) = Unit
 
+        override suspend fun updateFinalFilePath(
+            taskId: String,
+            finalFilePath: String,
+            updatedAtMs: Long,
+        ) = Unit
+
         override suspend fun getTask(taskId: String): StoredDownloadTask? = null
 
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
