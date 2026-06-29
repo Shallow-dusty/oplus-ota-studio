@@ -1,6 +1,7 @@
 package dev.shallowdusty.oplusotastudio
 
 import dev.shallowdusty.oplusotastudio.core.download.DownloadFilePromoter
+import dev.shallowdusty.oplusotastudio.core.download.DownloadStorageSnapshot
 import dev.shallowdusty.oplusotastudio.core.download.PromotedDownloadFile
 import dev.shallowdusty.oplusotastudio.core.download.SimpleDownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
@@ -78,6 +79,27 @@ class AppGraphTest {
             .apply { isAccessible = true }
 
         assertSame(promoter, field.get(engine))
+    }
+
+    @Test
+    fun `passes supplied storage snapshot provider to real download engine`() {
+        val provider = {
+            DownloadStorageSnapshot(
+                tempAvailableBytes = Long.MAX_VALUE,
+                finalAvailableBytes = Long.MAX_VALUE,
+                tempAndFinalShareVolume = true,
+            )
+        }
+        val graph = AppGraph(
+            downloadTempRoot = File("build/tmp/app-graph-storage-preflight-test"),
+            storageSnapshotProvider = provider,
+        )
+
+        val engine = assertInstanceOf(SimpleDownloadEngine::class.java, graph.downloadEngine)
+        val field = SimpleDownloadEngine::class.java.getDeclaredField("storageSnapshotProvider")
+            .apply { isAccessible = true }
+
+        assertSame(provider, field.get(engine))
     }
 
     @Test
