@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":core-model"))
 
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
