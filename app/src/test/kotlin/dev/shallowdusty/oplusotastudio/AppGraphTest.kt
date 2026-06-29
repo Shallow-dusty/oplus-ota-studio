@@ -2,6 +2,7 @@ package dev.shallowdusty.oplusotastudio
 
 import dev.shallowdusty.oplusotastudio.core.download.DownloadFilePromoter
 import dev.shallowdusty.oplusotastudio.core.download.DownloadStorageSnapshot
+import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
 import dev.shallowdusty.oplusotastudio.core.download.PromotedDownloadFile
 import dev.shallowdusty.oplusotastudio.core.download.SimpleDownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
@@ -16,9 +17,11 @@ import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class AppGraphTest {
@@ -110,6 +113,27 @@ class AppGraphTest {
         assertSame(repository, graph.packageRepository)
     }
 
+    @Test
+    fun `cleans orphaned download parts while keeping stored task parts`() = runTest {
+        val tempRoot = testTempRoot("app-graph-janitor")
+        val activePart = tempRoot.resolve("active.zip.part").also { it.writeText("active") }
+        val orphanPart = tempRoot.resolve("orphan.zip.part").also { it.writeText("orphan") }
+        val store = RecordingDownloadTaskStore(
+            observedTasks = listOf(storedTask(tempFilePath = activePart.path)),
+        )
+        val graph = AppGraph(
+            downloadTempRoot = tempRoot,
+            downloadTaskStore = store,
+            downloadTempFileJanitor = DownloadTempFileJanitor(listOf(tempRoot)),
+        )
+
+        val result = graph.cleanOrphanedDownloadParts()
+
+        assertTrue(activePart.exists())
+        assertFalse(orphanPart.exists())
+        assertEquals(listOf(orphanPart.absolutePath), result?.deletedPaths)
+    }
+
     private class RecordingPackageRepository : PackageRepository {
         override suspend fun record(entry: HistoryEntry) = Unit
 
@@ -124,7 +148,36 @@ class AppGraphTest {
         ): PromotedDownloadFile = PromotedDownloadFile(sourceFile.absolutePath)
     }
 
-    private class RecordingDownloadTaskStore : DownloadTaskStore {
+    private fun testTempRoot(name: String): File {
+        val dir = File("build/tmp/$name")
+        dir.deleteRecursively()
+        dir.mkdirs()
+        return dir
+    }
+
+    private fun storedTask(tempFilePath: String): StoredDownloadTask =
+        StoredDownloadTask(
+            taskId = "task-1",
+            pkg = OtaPackage(
+                versionName = "test",
+                type = "full",
+                sizeBytes = 3L,
+                sourceHost = "127.0.0.1",
+                downloadUrl = "http://127.0.0.1/pkg.zip",
+                md5 = null,
+            ),
+            tempFilePath = tempFilePath,
+            finalFilePath = null,
+            etag = null,
+            lastModified = null,
+            acceptRanges = false,
+            state = DownloadState.Queued,
+            updatedAtMs = 100L,
+        )
+
+    private class RecordingDownloadTaskStore(
+        private val observedTasks: List<StoredDownloadTask> = emptyList(),
+    ) : DownloadTaskStore {
         val created = mutableListOf<String>()
 
         override suspend fun createQueuedTask(
@@ -158,6 +211,6 @@ class AppGraphTest {
 
         override suspend fun getTask(taskId: String): StoredDownloadTask? = null
 
-        override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
+        override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(observedTasks)
     }
 }
