@@ -347,7 +347,7 @@ The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver
 - **Default scaffold baseline:** Kotlin `2.4.0`, AGP `9.2.1`, Gradle `9.6.1`, JDK `17`, SDK Build Tools `36.0.0`, Compose BOM pinned in `libs.versions.toml`.
 - **Fallback baseline if AGP 9.2 or Kotlin 2.4 blocks Compose/Room/KSP stability:** Kotlin `2.2.21`, AGP `8.13.x`, JDK `17`, targetSdk `35`. If the fallback is used, open a `docs:` follow-up to record why and when to retry the modern baseline.
 - Build variants: `debug` (verbose logs, no R8), `release` (R8 full mode, obfuscation on, signed via a keystore stored outside the repo).
-- Lint and `detekt` run in CI; new code must be clean.
+- Android Lint runs in CI; new code must be clean. **detekt deferred:** no stable detekt release supports Kotlin 2.4.0 as of 2026-06 (1.23.8 tops out at Kotlin 2.0.21; 2.0.0-alpha.5 supports 2.4.0 but is excluded by the no-snapshot/alpha rule below). detekt is re-enabled as a follow-up once a stable release supporting Kotlin 2.4.0 ships; until then Android Lint is the sole static check.
 - **CI:** GitHub Actions matrix (unit tests on JVM, instrumentation on API 29/34 emulators via `reactivecircus/android-emulator-runner`). Block merges on red unit tests; instrumentation is informational until stable.
 - **Branch & commit:** trunk `main` protected; feature branches `feat/`, `fix/`, `docs/`; squash-merge PRs; conventional-commit messages (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
 - **Dependencies:** version catalog (`libs.versions.toml`); no snapshot dependencies in `main`.
@@ -360,8 +360,8 @@ Done when:
 - [ ] Repo has Apache-2.0 `LICENSE`, `README.md` pointing to this spec, `.gitignore`, version catalog, Gradle wrapper, and CI skeleton.
 - [ ] Android project compiles with the selected §13 baseline and contains the planned modules with empty but buildable source sets.
 - [ ] `core-model` defines `OtaProfile`, `OtaPackage`, `OtaLookupResult`, `DownloadState`, and error categories with pure JVM tests.
-- [ ] `core-download` has a pure Kotlin state machine test suite for every transition in §3.5 before WorkManager exists.
-- [ ] CI runs `./gradlew test lint detekt` or the closest available scaffold equivalent.
+- [ ] `core-download` has a pure Kotlin state machine test suite for every transition in §3.5 before WorkManager exists. *(Backend module; lands when codex implements core-download. Frontend v0.0 defines the `DownloadState` type this suite exercises.)*
+- [ ] CI runs `./gradlew test lintDebug` (detekt deferred per §13; the `detekt` portion of this criterion is met when a stable detekt supporting Kotlin 2.4.0 ships).
 - [ ] Every bootstrap concern lands as a separate commit: license/readme, Gradle scaffold, module graph, CI, first domain tests.
 
 ### v0.1 — Core MVP (lookup + download + verify)

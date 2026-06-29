@@ -39,14 +39,19 @@ state machine, storage, error taxonomy, milestones) is documented there.
 
 ## Build
 
-Requires JDK 17 and Android SDK with Build Tools 36.0.0. The Gradle wrapper is
-pinned to Gradle 9.6.1.
+Requires JDK 17 and Android SDK with Build Tools 36.0.0 and platform android-37.
+The Gradle wrapper is pinned to Gradle 9.6.1.
 
 ```sh
 ./gradlew assembleDebug      # build the app
 ./gradlew test               # pure-JVM unit tests
-./gradlew detekt lintDebug   # static checks
+./gradlew lintDebug          # Android Lint (CI runs these three)
 ```
+
+> **detekt deferred.** No stable detekt release supports Kotlin 2.4.0 yet
+> (1.23.8 tops out at Kotlin 2.0.21; 2.0.0-alpha.5 supports 2.4.0 but is a
+> pre-release and excluded by the "no snapshot/alpha in main" rule). detekt
+> lands as a follow-up once a stable detekt supporting Kotlin 2.4.0 ships.
 
 ## License
 
