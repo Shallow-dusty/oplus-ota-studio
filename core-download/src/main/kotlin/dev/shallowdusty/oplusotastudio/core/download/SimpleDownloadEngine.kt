@@ -183,7 +183,8 @@ class SimpleDownloadEngine(
                     is ChecksumResult.Mismatch -> DownloadState.Failed(
                         category = OtaErrorCategory.ChecksumMismatch,
                         retriesRemaining = 0,
-                        raw = "expected ${result.expectedHash}, got ${result.actualHash} (${result.algorithm.name})",
+                        raw = "expected ${result.expectedHash}, got ${result.actualHash} " +
+                            "(${result.algorithm.name}); quarantined at ${quarantineBadFile().path}",
                     )
                         .let { updateState(it) }
                 }
@@ -226,6 +227,15 @@ class SimpleDownloadEngine(
                 packageSizeBytes = pkg.sizeBytes,
                 snapshot = snapshotProvider(),
             ) as? DownloadStoragePreflightResult.Failed
+        }
+
+        private fun quarantineBadFile(): File {
+            val badFile = tempFile.resolveSibling("$taskId.zip.bad")
+            badFile.delete()
+            if (tempFile.exists()) {
+                tempFile.renameTo(badFile)
+            }
+            return badFile
         }
 
         private fun buildRequest(rangeStart: Long?): Request {

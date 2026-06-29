@@ -18,6 +18,7 @@ import okhttp3.Headers
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -61,9 +62,10 @@ class SimpleDownloadEngineTest {
     fun `checksum mismatch becomes failed state`() = runTest {
         server.enqueue(MockResponse(code = 200, body = "abc"))
         server.start()
+        val tempRoot = testTempRoot("mismatch")
         val engine = SimpleDownloadEngine(
             client = OkHttpClient(),
-            tempRoot = testTempRoot("mismatch"),
+            tempRoot = tempRoot,
             scope = backgroundScope,
         )
 
@@ -82,6 +84,8 @@ class SimpleDownloadEngineTest {
         assertEquals(OtaErrorCategory.ChecksumMismatch, failed.category)
         assertEquals(0, failed.retriesRemaining)
         assertTrue(failed.raw?.contains("expected 00000000000000000000000000000000") == true)
+        assertFalse(tempRoot.resolve("${task.taskId}.zip.part").exists())
+        assertEquals("abc", tempRoot.resolve("${task.taskId}.zip.bad").readText())
     }
 
     @Test
