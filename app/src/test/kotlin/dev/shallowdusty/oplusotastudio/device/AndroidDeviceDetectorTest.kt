@@ -63,4 +63,26 @@ class AndroidDeviceDetectorTest {
         assertEquals(OtaRegion.Global, profile.region)
         assertTrue(profile.incomplete)
     }
+
+    @Test
+    fun `recovers OTA version from display build string`() = runTest {
+        val detector = AndroidDeviceDetector(
+            buildFactsProvider = {
+                AndroidBuildFacts(
+                    model = "LE2123",
+                    product = "OnePlus9Pro",
+                    display = "OnePlus9Pro_Oxygen_OS.LE28AA_11.0.2.2",
+                    androidVersion = "11",
+                    securityPatch = "2021-09-05",
+                )
+            },
+            propertyProvider = MapDevicePropertyProvider(),
+            localeCountryProvider = { "US" },
+        )
+
+        val profile = detector.detect()
+
+        assertEquals("11.0.2.2.LE28AA", profile.otaVersion)
+        assertFalse(profile.incomplete)
+    }
 }

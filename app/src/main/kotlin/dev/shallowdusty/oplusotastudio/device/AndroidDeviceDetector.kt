@@ -54,7 +54,7 @@ class AndroidDeviceDetector(
             "ro.build.version.ota",
             "ro.oppo.version",
             "ro.build.version.opporom",
-        ) ?: facts.display?.takeIf { looksLikeBuildString(it) }
+        ) ?: parseDisplayOtaVersion(facts.display)
 
         return DeviceProfile(
             model = facts.model,
@@ -84,6 +84,19 @@ class AndroidDeviceDetector(
         }
     }
 
-    private fun looksLikeBuildString(value: String): Boolean =
-        value.contains('_') || value.contains('.')
+    private fun parseDisplayOtaVersion(value: String?): String? {
+        val display = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        DisplayFullBuildPattern.find(display)?.let { return it.value }
+        DisplayVersionWithSuffixPattern.find(display)?.let { return it.value }
+        val version = DisplayVersionPattern.find(display)?.value ?: return null
+        val suffix = DisplayBuildSuffixPattern.find(display)?.value
+        return if (suffix != null) "$version.$suffix" else version
+    }
+
+    private companion object {
+        val DisplayFullBuildPattern = Regex("""\b[A-Z]{2}\d{4}_[A-Za-z0-9.]+(?:_[A-Za-z0-9.]+)+\b""")
+        val DisplayVersionWithSuffixPattern = Regex("""(?<![0-9.])\d+(?:\.\d+){2,}\.[A-Z]{2}\d{2}[A-Z]{2}\b""")
+        val DisplayVersionPattern = Regex("""(?<![0-9.])\d+(?:\.\d+){2,}(?![0-9.])""")
+        val DisplayBuildSuffixPattern = Regex("""(?<![A-Z0-9])[A-Z]{2}\d{2}[A-Z]{2}(?![A-Z0-9])""")
+    }
 }
