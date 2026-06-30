@@ -230,6 +230,20 @@ class SimpleDownloadEngine(
                 storedTask?.validatorsChanged(response) == true
             ) {
                 response.close()
+                updateState(
+                    DownloadState.Failed(
+                        category = OtaErrorCategory.Server,
+                        retriesRemaining = maxAttempts - 1,
+                        raw = "Server changed package, restarting download from zero",
+                    ),
+                )
+                updateState(
+                    DownloadState.Retrying(
+                        attempt = 1,
+                        maxAttempts = maxAttempts,
+                        category = OtaErrorCategory.Server,
+                    ),
+                )
                 tempFile.delete()
                 rangeStart = null
                 response = executeRequest(rangeStart)
