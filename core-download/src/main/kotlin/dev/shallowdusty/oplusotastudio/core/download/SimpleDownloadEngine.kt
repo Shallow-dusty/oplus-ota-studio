@@ -84,6 +84,7 @@ class SimpleDownloadEngine(
                 retriesRemaining = 0,
                 raw = "Download task not found: $taskId",
             )
+        if (storedTask.state.isTerminal) return storedTask.state
         val task = SimpleDownloadTask(
             taskId = storedTask.taskId,
             pkg = storedTask.pkg,
@@ -409,3 +410,12 @@ private sealed interface DownloadAttemptOutcome {
         val raw: String?,
     ) : DownloadAttemptOutcome
 }
+
+private val DownloadState.isTerminal: Boolean
+    get() =
+        when (this) {
+            DownloadState.Verified,
+            DownloadState.Canceled -> true
+            is DownloadState.Failed -> retriesRemaining <= 0
+            else -> false
+        }
