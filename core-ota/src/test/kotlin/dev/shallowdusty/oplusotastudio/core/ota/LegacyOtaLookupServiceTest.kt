@@ -67,6 +67,30 @@ class LegacyOtaLookupServiceTest {
         assertEquals("timeout", error.raw)
     }
 
+    @Test
+    fun `rejects invalid profile before sending request`() = runTest {
+        val transport = FakeOtaTransport(
+            OtaHttpResponse(
+                statusCode = 200,
+                body = "<root><Command>NO_NEW_VERSION</Command></root>",
+                sourceHost = "otacn.oppo.com",
+            ),
+        )
+
+        val result = LegacyOtaLookupService(transport = transport).lookup(
+            OtaProfile(
+                model = "",
+                region = OtaRegion.China,
+                otaVersion = " ",
+            ),
+        )
+
+        val error = assertInstanceOf(OtaLookupResult.Error::class.java, result)
+        assertEquals(OtaErrorCategory.Device, error.category)
+        assertEquals("MissingModel,MissingOtaVersion", error.raw)
+        assertEquals(null, transport.lastRequest)
+    }
+
     private fun sampleProfile(): OtaProfile =
         OtaProfile(
             model = "LE2120",
