@@ -27,7 +27,10 @@ class LegacyOtaProtocol(
             "device" to (profile.deviceCodename ?: profile.model),
         )
         return LegacyOtaRequest(
-            host = hostResolver.resolve(profile.region),
+            host = profile.hostOverride
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: hostResolver.resolve(profile.region),
             path = "/OnePlusOTA/OnePlus_OTA.php",
             contentType = "application/x-www-form-urlencoded",
             body = form.entries.joinToString("&") { (key, value) ->

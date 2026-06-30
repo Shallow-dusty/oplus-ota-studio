@@ -39,6 +39,18 @@ class OtaProfileTest {
     }
 
     @Test
+    fun `profile can carry advanced host override`() {
+        val profile = OtaProfile(
+            model = "LE2123",
+            region = OtaRegion.Global,
+            otaVersion = "11.0.2.2.LE28AA",
+            hostOverride = "ota.example.invalid",
+        )
+
+        assertEquals("ota.example.invalid", profile.hostOverride)
+    }
+
+    @Test
     fun `validation accepts complete lookup profile`() {
         val profile = OtaProfile(
             model = "LE2123",

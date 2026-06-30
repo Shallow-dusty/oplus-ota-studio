@@ -31,6 +31,20 @@ class LegacyOtaProtocolTest {
     }
 
     @Test
+    fun `builds legacy request with profile host override`() {
+        val profile = OtaProfile(
+            model = "LE2120",
+            region = OtaRegion.China,
+            otaVersion = "LE2120_11.H.23_0001_000000000001",
+            hostOverride = "ota-override.example.invalid",
+        )
+
+        val request = LegacyOtaProtocol().buildRequest(profile)
+
+        assertEquals("ota-override.example.invalid", request.host)
+    }
+
+    @Test
     fun `parses legacy package found response`() {
         val xml = fixture("synthetic-legacy-oneplus9pro-cn-success.xml")
 

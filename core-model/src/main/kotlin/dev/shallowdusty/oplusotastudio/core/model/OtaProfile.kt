@@ -8,7 +8,8 @@ package dev.shallowdusty.oplusotastudio.core.model
  *
  * [otaVersion] is required: a lookup cannot be sent without a build string
  * (spec §2.3 blocks lookup when the profile is incomplete). [region] drives
- * host selection (spec §1.1).
+ * host selection (spec §1.1). [hostOverride] is an advanced manual escape
+ * hatch for region map drift and must be user-confirmed before lookup.
  */
 data class OtaProfile(
     val model: String,
@@ -19,6 +20,8 @@ data class OtaProfile(
     val systemType: String? = null,
     /** Optional device codename, distinct from marketing model. */
     val deviceCodename: String? = null,
+    /** Optional advanced host override, e.g. when the built-in region map is stale. */
+    val hostOverride: String? = null,
 )
 
 enum class OtaProfileValidationError {
