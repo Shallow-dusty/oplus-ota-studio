@@ -2,6 +2,7 @@ package dev.shallowdusty.oplusotastudio.download
 
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
+import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
 import java.io.File
@@ -33,6 +34,35 @@ class WorkScheduledDownloadEngineTest {
         assertEquals("task-1", store.created.single().taskId)
         assertTrue(store.created.single().tempFilePath.endsWith("task-1.zip.part"))
         assertEquals(DownloadState.Queued, task.state.first())
+    }
+
+    @Test
+    fun `enqueue rejects new task when persisted active queue reaches limit`() = runTest {
+        val store = RecordingDownloadTaskStore(
+            initialTasks = listOf(
+                storedTask(
+                    taskId = "existing",
+                    state = DownloadState.Queued,
+                ),
+            ),
+        )
+        val scheduler = RecordingDownloadWorkScheduler()
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/queue-limit"),
+            idGenerator = { "rejected" },
+            maxQueuedTasks = 1,
+        )
+
+        val task = engine.enqueue(samplePackage())
+
+        val failed = task.state.first() as DownloadState.Failed
+        assertEquals(OtaErrorCategory.File, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertTrue(failed.raw?.contains("queue limit") == true)
+        assertTrue(store.created.isEmpty())
+        assertTrue(scheduler.scheduled.isEmpty())
     }
 
     @Test

@@ -506,6 +506,52 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `rejects enqueue when active queue reaches limit`() = runTest {
+        val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .body("abc")
+                    .bodyDelay(1, TimeUnit.SECONDS)
+                    .build(),
+            )
+            server.start()
+            val store = RecordingDownloadTaskStore()
+            val engine = SimpleDownloadEngine(
+                client = OkHttpClient(),
+                tempRoot = testTempRoot("queue-limit"),
+                scope = engineScope,
+                taskStore = store,
+                maxQueuedTasks = 1,
+            )
+
+            engine.enqueue(
+                samplePackage(
+                    url = server.url("/first.zip").toString(),
+                    md5 = "900150983cd24fb0d6963f7d28e17f72",
+                ),
+            )
+            val rejected = engine.enqueue(
+                samplePackage(
+                    url = server.url("/second.zip").toString(),
+                    md5 = "900150983cd24fb0d6963f7d28e17f72",
+                ),
+            )
+
+            val failed = rejected.state.first() as DownloadState.Failed
+            assertEquals(OtaErrorCategory.File, failed.category)
+            assertEquals(0, failed.retriesRemaining)
+            assertTrue(failed.raw?.contains("queue limit") == true)
+            assertEquals(1, store.created.size)
+            waitUntilRequestCount(1)
+            assertEquals(1, server.requestCount)
+        } finally {
+            engineScope.cancel()
+        }
+    }
+
+    @Test
     fun `cancel deletes part file and removes stored task`() = runTest {
         val store = RecordingDownloadTaskStore()
         val tempRoot = testTempRoot("cancel-cleanup")
@@ -915,6 +961,14 @@ class SimpleDownloadEngineTest {
             Thread.sleep(25)
         }
         assertEquals(DownloadState.Verified, task.state.first())
+    }
+
+    private fun waitUntilRequestCount(expected: Int) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (System.nanoTime() < deadline) {
+            if (server.requestCount >= expected) return
+            Thread.sleep(10)
+        }
     }
 
     private data class CreatedTask(

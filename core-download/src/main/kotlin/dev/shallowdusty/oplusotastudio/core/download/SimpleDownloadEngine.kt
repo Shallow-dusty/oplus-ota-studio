@@ -41,6 +41,7 @@ class SimpleDownloadEngine(
     private val storagePreflight: DownloadStoragePreflight = DownloadStoragePreflight(),
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
     private val maxAttempts: Int = 3,
+    private val maxQueuedTasks: Int = DefaultMaxQueuedTasks,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : DownloadEngine {
 
@@ -51,29 +52,37 @@ class SimpleDownloadEngine(
 
     override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
         tempRoot.mkdirs()
-        val taskId = idGenerator()
-        val storedTask = taskStore?.getTask(taskId)
-        val tempFile = storedTask?.tempFilePath?.let(::File) ?: tempRoot.resolve("$taskId.zip.part")
-        if (storedTask == null) {
-            taskStore?.createQueuedTask(
+        return queueMutex.withLock {
+            val taskId = idGenerator()
+            if (activeQueueSize() >= maxQueuedTasks) {
+                return@withLock QueueRejectedDownloadTask(
+                    taskId = taskId,
+                    maxQueuedTasks = maxQueuedTasks,
+                ).also { task ->
+                    tasks.value = tasks.value + task
+                }
+            }
+            val storedTask = taskStore?.getTask(taskId)
+            val tempFile = storedTask?.tempFilePath?.let(::File) ?: tempRoot.resolve("$taskId.zip.part")
+            if (storedTask == null) {
+                taskStore?.createQueuedTask(
+                    taskId = taskId,
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    updatedAtMs = nowMs(),
+                )
+            }
+            val task = SimpleDownloadTask(
                 taskId = taskId,
                 pkg = pkg,
-                tempFilePath = tempFile.path,
-                updatedAtMs = nowMs(),
+                tempFile = tempFile,
+                storedTask = storedTask,
             )
-        }
-        val task = SimpleDownloadTask(
-            taskId = taskId,
-            pkg = pkg,
-            tempFile = tempFile,
-            storedTask = storedTask,
-        )
-        tasks.value = tasks.value + task
-        queueMutex.withLock {
+            tasks.value = tasks.value + task
             queuedTasks.addLast(task)
             startNextTaskIfIdle()
+            task
         }
-        return task
     }
 
     override fun observeAll(): Flow<List<DownloadTask>> = tasks.asStateFlow()
@@ -448,6 +457,9 @@ class SimpleDownloadEngine(
         }
     }
 
+    private fun activeQueueSize(): Int =
+        queuedTasks.size + if (activeTask != null) 1 else 0
+
     private fun nowMs(): Long = System.currentTimeMillis()
 
     private fun File.truncateTo(bytes: Long) {
@@ -455,9 +467,30 @@ class SimpleDownloadEngine(
     }
 
     private companion object {
+        const val DefaultMaxQueuedTasks = 20
         const val ProgressUpdateMinBytes = 1024L * 1024L
         const val ProgressUpdateMinIntervalMs = 250L
     }
+}
+
+private class QueueRejectedDownloadTask(
+    override val taskId: String,
+    maxQueuedTasks: Int,
+) : DownloadTask {
+    private val currentState = MutableStateFlow(
+        DownloadState.Failed(
+            category = OtaErrorCategory.File,
+            retriesRemaining = 0,
+            raw = "Download queue limit reached ($maxQueuedTasks tasks)",
+        ),
+    )
+    override val state: Flow<DownloadState> = currentState.asStateFlow()
+
+    override suspend fun pause() = Unit
+
+    override suspend fun resume() = Unit
+
+    override suspend fun cancel() = Unit
 }
 
 private sealed interface DownloadAttemptOutcome {

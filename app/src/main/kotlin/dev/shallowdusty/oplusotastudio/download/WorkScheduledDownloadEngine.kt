@@ -4,10 +4,14 @@ import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
+import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class WorkScheduledDownloadEngine(
@@ -16,11 +20,21 @@ class WorkScheduledDownloadEngine(
     private val tempRoot: File,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
     private val nowMs: () -> Long = { System.currentTimeMillis() },
+    private val maxQueuedTasks: Int = DefaultMaxQueuedTasks,
 ) : DownloadEngine {
 
     override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
         tempRoot.mkdirs()
         val taskId = idGenerator()
+        val activeTasks = taskStore.observeTasks()
+            .first()
+            .count { task -> !task.state.isTerminal }
+        if (activeTasks >= maxQueuedTasks) {
+            return QueueRejectedDownloadTask(
+                taskId = taskId,
+                maxQueuedTasks = maxQueuedTasks,
+            )
+        }
         val tempFile = tempRoot.resolve("$taskId.zip.part")
         taskStore.createQueuedTask(
             taskId = taskId,
@@ -79,6 +93,30 @@ class WorkScheduledDownloadEngine(
             private suspend fun currentState(): DownloadState? =
                 taskStore.getTask(taskId)?.state
         }
+
+    private companion object {
+        const val DefaultMaxQueuedTasks = 20
+    }
+}
+
+private class QueueRejectedDownloadTask(
+    override val taskId: String,
+    maxQueuedTasks: Int,
+) : DownloadTask {
+    private val currentState = MutableStateFlow(
+        DownloadState.Failed(
+            category = OtaErrorCategory.File,
+            retriesRemaining = 0,
+            raw = "Download queue limit reached ($maxQueuedTasks tasks)",
+        ),
+    )
+    override val state: Flow<DownloadState> = currentState.asStateFlow()
+
+    override suspend fun pause() = Unit
+
+    override suspend fun resume() = Unit
+
+    override suspend fun cancel() = Unit
 }
 
 private val DownloadState.isTerminal: Boolean
