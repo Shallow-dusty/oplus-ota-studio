@@ -5,13 +5,16 @@ import androidx.lifecycle.viewModelScope
 import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DeviceProfile
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
+import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
+import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.model.isLookupReady
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,6 +54,9 @@ class LookupViewModel(
     private val deviceDetector: DeviceDetector,
     private val lookupService: OtaLookupService,
     private val downloadEngine: DownloadEngine? = null,
+    private val packageRepository: PackageRepository? = null,
+    private val nowMs: () -> Long = { System.currentTimeMillis() },
+    private val historyIdGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LookupUiState>(LookupUiState.Detecting)
@@ -90,7 +96,10 @@ class LookupViewModel(
         viewModelScope.launch {
             _uiState.value = LookupUiState.Querying
             _uiState.value = when (val result = lookupService.lookup(profile)) {
-                is OtaLookupResult.PackageFound -> LookupUiState.PackageFound(result.pkg)
+                is OtaLookupResult.PackageFound -> {
+                    recordLookup(profile, result.pkg)
+                    LookupUiState.PackageFound(result.pkg)
+                }
                 OtaLookupResult.NoUpdate -> LookupUiState.NoUpdate
                 is OtaLookupResult.Error -> LookupUiState.Error(result.category, result.raw)
             }
@@ -115,6 +124,21 @@ class LookupViewModel(
         viewModelScope.launch {
             engine.enqueue(pkg)
         }
+    }
+
+    private suspend fun recordLookup(profile: OtaProfile, pkg: OtaPackage) {
+        packageRepository?.record(
+            HistoryEntry(
+                id = historyIdGenerator(),
+                profileModel = profile.model,
+                profileRegion = profile.region,
+                packageName = pkg.versionName,
+                packageSize = pkg.sizeBytes,
+                lookedUpAtMs = nowMs(),
+                downloadedAtMs = null,
+                localFilePath = null,
+            ),
+        )
     }
 }
 

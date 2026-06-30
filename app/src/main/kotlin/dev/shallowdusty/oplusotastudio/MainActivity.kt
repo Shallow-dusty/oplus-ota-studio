@@ -105,6 +105,7 @@ private fun OtaStudioApp() {
                             deviceDetector = graph.deviceDetector,
                             lookupService = graph.otaLookupService,
                             downloadEngine = graph.downloadEngine,
+                            packageRepository = graph.packageRepository,
                         )
                     },
                 )

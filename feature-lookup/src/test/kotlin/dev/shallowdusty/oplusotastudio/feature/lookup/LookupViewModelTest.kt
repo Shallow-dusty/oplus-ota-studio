@@ -4,13 +4,16 @@ import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DeviceProfile
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
+import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
+import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LookupViewModelTest {
 
     @BeforeEach
@@ -61,6 +65,38 @@ class LookupViewModelTest {
         vm.lookup()
         advanceUntilIdle()
         assertEquals(LookupUiState.PackageFound(pkg), vm.uiState.value)
+    }
+
+    @Test
+    fun `package found lookup is recorded in history`() = runTest {
+        val repository = RecordingPackageRepository()
+        val pkg = samplePackage()
+        val vm = LookupViewModel(
+            deviceDetector = FakeDeviceDetector(completeProfile()),
+            lookupService = FakeLookupService(OtaLookupResult.PackageFound(pkg)),
+            packageRepository = repository,
+            nowMs = { 1234L },
+            historyIdGenerator = { "history-1" },
+        )
+
+        vm.lookup()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                HistoryEntry(
+                    id = "history-1",
+                    profileModel = "LE2123",
+                    profileRegion = OtaRegion.Global,
+                    packageName = "12.0.0.0.LE28AA",
+                    packageSize = 3_500_000_000L,
+                    lookedUpAtMs = 1234L,
+                    downloadedAtMs = null,
+                    localFilePath = null,
+                ),
+            ),
+            repository.recorded,
+        )
     }
 
     @Test
@@ -249,5 +285,15 @@ class LookupViewModelTest {
         }
 
         override fun observeAll(): Flow<List<DownloadTask>> = flowOf(emptyList())
+    }
+
+    private class RecordingPackageRepository : PackageRepository {
+        val recorded = mutableListOf<HistoryEntry>()
+
+        override suspend fun record(entry: HistoryEntry) {
+            recorded += entry
+        }
+
+        override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(recorded)
     }
 }
