@@ -2,6 +2,7 @@ package dev.shallowdusty.oplusotastudio.download
 
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
+import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -44,6 +45,30 @@ class DownloadWorkerExecutorAdapterTest {
                 retriesRemaining = 0,
                 raw = "bad checksum",
             )
+        }
+
+        assertEquals(
+            DownloadWorkerExecutionResult.Failed,
+            executor.execute("task-1"),
+        )
+    }
+
+    @Test
+    fun `returns retry when stored task execution has network io exception`() = runTest {
+        val executor = DownloadWorkerExecutorAdapter {
+            throw IOException("socket closed")
+        }
+
+        assertEquals(
+            DownloadWorkerExecutionResult.Retry,
+            executor.execute("task-1"),
+        )
+    }
+
+    @Test
+    fun `returns failure when stored task execution has non-io exception`() = runTest {
+        val executor = DownloadWorkerExecutorAdapter {
+            throw IllegalStateException("bad stored task")
         }
 
         assertEquals(
