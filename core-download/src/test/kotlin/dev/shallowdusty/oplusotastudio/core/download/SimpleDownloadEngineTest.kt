@@ -6,6 +6,7 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
@@ -201,6 +202,39 @@ class SimpleDownloadEngineTest {
             FinalPathUpdate(task.taskId, "content://downloads/pkg.zip"),
             store.finalPaths.single(),
         )
+    }
+
+    @Test
+    fun `promotion io failure becomes file failure without retrying download`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("promotion-failure"),
+            scope = backgroundScope,
+            taskStore = store,
+            filePromoter = ThrowingDownloadFilePromoter(IOException("Downloads write failed")),
+            maxAttempts = 1,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = "900150983cd24fb0d6963f7d28e17f72",
+            ),
+        )
+
+        val finalState = withTimeout(5.seconds) {
+            task.state.first { it is DownloadState.Failed }
+        }
+
+        val failed = finalState as DownloadState.Failed
+        assertEquals(OtaErrorCategory.File, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertEquals("Downloads write failed", failed.raw)
+        assertEquals(1, server.requestCount)
+        assertEquals(failed, store.updates.last().state)
     }
 
     @Test
@@ -679,6 +713,18 @@ class SimpleDownloadEngineTest {
         ): PromotedDownloadFile {
             promotions += Promotion(taskId, sourceFile)
             return PromotedDownloadFile(finalPath)
+        }
+    }
+
+    private class ThrowingDownloadFilePromoter(
+        private val error: IOException,
+    ) : DownloadFilePromoter {
+        override suspend fun promote(
+            taskId: String,
+            pkg: OtaPackage,
+            sourceFile: File,
+        ): PromotedDownloadFile {
+            throw error
         }
     }
 

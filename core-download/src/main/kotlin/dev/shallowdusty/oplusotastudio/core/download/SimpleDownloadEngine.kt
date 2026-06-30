@@ -244,7 +244,14 @@ class SimpleDownloadEngine(
             ) {
                 is ChecksumResult.Verified,
                 ChecksumResult.Unverified -> {
-                    promoteVerifiedFile()
+                    try {
+                        promoteVerifiedFile()
+                    } catch (error: IOException) {
+                        return DownloadAttemptOutcome.Failed(
+                            category = OtaErrorCategory.File,
+                            raw = error.message,
+                        )
+                    }
                     updateState(DownloadState.Verified)
                 }
                 is ChecksumResult.Mismatch -> DownloadState.Failed(
