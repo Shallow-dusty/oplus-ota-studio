@@ -27,6 +27,7 @@ import dev.shallowdusty.oplusotastudio.fake.FakeDownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.fake.FakePackageRepository
 import dev.shallowdusty.oplusotastudio.logging.AppLogLevel
 import dev.shallowdusty.oplusotastudio.logging.AppLogger
+import dev.shallowdusty.oplusotastudio.logging.LoggingOtaLookupService
 import dev.shallowdusty.oplusotastudio.logging.NoOpAppLogSink
 import java.io.File
 import kotlinx.coroutines.flow.first
@@ -58,8 +59,11 @@ class AppGraph(
     downloadWorkerExecutor: DownloadWorkerExecutor? = null,
 ) {
     val deviceDetector: DeviceDetector = AndroidDeviceDetector()
-    val otaLookupService: OtaLookupService = LegacyOtaLookupService(
-        transport = OkHttpOtaTransport(),
+    val otaLookupService: OtaLookupService = LoggingOtaLookupService(
+        delegate = LegacyOtaLookupService(
+            transport = OkHttpOtaTransport(),
+        ),
+        logger = appLogger,
     )
     private val realDownloadEngine: SimpleDownloadEngine? = downloadTempRoot
         ?.let { tempRoot ->

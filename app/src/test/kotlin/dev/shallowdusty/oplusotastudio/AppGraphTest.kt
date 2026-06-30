@@ -26,6 +26,7 @@ import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
 import dev.shallowdusty.oplusotastudio.logging.AppLogger
 import dev.shallowdusty.oplusotastudio.logging.AppLogLevel
 import dev.shallowdusty.oplusotastudio.logging.AppLogSink
+import dev.shallowdusty.oplusotastudio.logging.LoggingOtaLookupService
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,7 +46,10 @@ class AppGraphTest {
     fun `uses real OTA lookup service`() {
         val graph = AppGraph()
 
-        assertInstanceOf(LegacyOtaLookupService::class.java, graph.otaLookupService)
+        val loggingService = assertInstanceOf(LoggingOtaLookupService::class.java, graph.otaLookupService)
+        val delegateField = LoggingOtaLookupService::class.java.getDeclaredField("delegate")
+            .apply { isAccessible = true }
+        assertInstanceOf(LegacyOtaLookupService::class.java, delegateField.get(loggingService))
     }
 
     @Test
