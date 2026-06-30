@@ -64,4 +64,12 @@ class DownloadStateStorageCodecTest {
             DownloadStateStorageCodec.toDomain(columns),
         )
     }
+
+    @Test
+    fun `unverified state round trips as terminal state`() {
+        val columns = DownloadStateStorageCodec.toColumns(DownloadState.Unverified)
+
+        assertEquals("Unverified", columns.state)
+        assertEquals(DownloadState.Unverified, DownloadStateStorageCodec.toDomain(columns))
+    }
 }

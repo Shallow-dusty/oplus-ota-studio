@@ -298,8 +298,7 @@ class SimpleDownloadEngine(
                     expectedMd5 = pkg.md5,
                 )
             ) {
-                is ChecksumResult.Verified,
-                ChecksumResult.Unverified -> {
+                is ChecksumResult.Verified -> {
                     try {
                         promoteVerifiedFile()
                     } catch (error: IOException) {
@@ -309,6 +308,17 @@ class SimpleDownloadEngine(
                         )
                     }
                     updateState(DownloadState.Verified)
+                }
+                ChecksumResult.Unverified -> {
+                    try {
+                        promoteVerifiedFile()
+                    } catch (error: IOException) {
+                        return DownloadAttemptOutcome.Failed(
+                            category = OtaErrorCategory.File,
+                            raw = error.message,
+                        )
+                    }
+                    updateState(DownloadState.Unverified)
                 }
                 is ChecksumResult.Mismatch -> DownloadState.Failed(
                     category = OtaErrorCategory.ChecksumMismatch,
@@ -522,6 +532,7 @@ private val DownloadState.isTerminal: Boolean
     get() =
         when (this) {
             DownloadState.Verified,
+            DownloadState.Unverified,
             DownloadState.Canceled -> true
             is DownloadState.Failed -> retriesRemaining <= 0
             else -> false

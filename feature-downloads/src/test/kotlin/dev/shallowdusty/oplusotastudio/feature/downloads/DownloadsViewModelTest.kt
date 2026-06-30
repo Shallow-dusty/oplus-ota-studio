@@ -5,6 +5,7 @@ import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DownloadsViewModelTest {
 
     @BeforeEach
@@ -75,6 +77,17 @@ class DownloadsViewModelTest {
         task.emit(DownloadState.Verified)
         advanceUntilIdle()
         assertEquals(DownloadState.Verified, vm.uiState.value.rows.first().state)
+    }
+
+    @Test
+    fun `unverified state is rendered`() = runTest {
+        val engine = FakeDownloadEngine()
+        val task = engine.enqueueNow(samplePackage().copy(md5 = null, sha256 = null)) as FakeDownloadTask
+        val vm = DownloadsViewModel(engine)
+        advanceUntilIdle()
+        task.emit(DownloadState.Unverified)
+        advanceUntilIdle()
+        assertEquals(DownloadState.Unverified, vm.uiState.value.rows.first().state)
     }
 
     @Test

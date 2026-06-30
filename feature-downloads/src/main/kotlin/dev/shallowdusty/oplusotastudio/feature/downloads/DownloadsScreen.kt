@@ -85,6 +85,7 @@ private fun DownloadRowCard(row: DownloadRow) {
             is DownloadState.Retrying -> RetryingContent(s)
             DownloadState.Verifying -> VerifyingContent()
             DownloadState.Verified -> StateLabel("Verified", color = MaterialTheme.colorScheme.primary)
+            DownloadState.Unverified -> UnverifiedContent()
             DownloadState.Canceled -> StateLabel("Canceled", color = MaterialTheme.colorScheme.onSurfaceVariant)
             is DownloadState.Failed -> FailedContent(s)
         }
@@ -139,6 +140,16 @@ private fun VerifyingContent() {
         CircularProgressIndicator(modifier = Modifier.height(16.dp))
         Text("Verifying checksum…", style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+@Composable
+private fun UnverifiedContent() {
+    StateLabel("Downloaded, not verified", color = MaterialTheme.colorScheme.tertiary)
+    Text(
+        "No checksum was provided. Transfer integrity is unknown.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable

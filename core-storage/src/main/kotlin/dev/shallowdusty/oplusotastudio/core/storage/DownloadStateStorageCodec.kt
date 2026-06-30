@@ -38,6 +38,7 @@ object DownloadStateStorageCodec {
             )
             DownloadState.Verifying -> base("Verifying")
             DownloadState.Verified -> base("Verified")
+            DownloadState.Unverified -> base("Unverified")
             DownloadState.Canceled -> base("Canceled")
             is DownloadState.Failed -> base(
                 state = "Failed",
@@ -68,6 +69,7 @@ object DownloadStateStorageCodec {
             )
             "Verifying" -> DownloadState.Verifying
             "Verified" -> DownloadState.Verified
+            "Unverified" -> DownloadState.Unverified
             "Canceled" -> DownloadState.Canceled
             "Failed" -> DownloadState.Failed(
                 category = enumValueOrDefault(columns.errorCategory, OtaErrorCategory.Unknown),

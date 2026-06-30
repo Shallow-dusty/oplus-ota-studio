@@ -131,6 +131,7 @@ private val DownloadState.isTerminal: Boolean
     get() =
         when (this) {
             DownloadState.Verified,
+            DownloadState.Unverified,
             DownloadState.Canceled -> true
             is DownloadState.Failed -> retriesRemaining <= 0
             else -> false

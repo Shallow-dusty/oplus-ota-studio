@@ -3,7 +3,7 @@ package dev.shallowdusty.oplusotastudio.core.model
 /**
  * Download task lifecycle state (spec §3.5 state machine).
  *
- * Terminal states: [Verified], [Canceled], and [Failed] once retries are
+ * Terminal states: [Verified], [Unverified], [Canceled], and [Failed] once retries are
  * exhausted. The transition logic itself lives in core-download
  * (DownloadStateMachine); this type only enumerates the states and the data
  * each carries so the UI can render without depending on the engine.
@@ -39,8 +39,11 @@ sealed interface DownloadState {
     /** Download complete, checksum being verified (spec §4). */
     data object Verifying : DownloadState
 
-    /** Checksum passed (or no checksum — package marked unverified). Terminal. */
+    /** Checksum passed. Terminal. */
     data object Verified : DownloadState
+
+    /** Download completed but no checksum was available, so transfer integrity is unknown. Terminal. */
+    data object Unverified : DownloadState
 
     /** User canceled. Terminal; .part + Room row cleaned up on next idle tick. */
     data object Canceled : DownloadState

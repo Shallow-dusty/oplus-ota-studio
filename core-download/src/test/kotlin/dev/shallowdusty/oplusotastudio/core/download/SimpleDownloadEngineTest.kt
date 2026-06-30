@@ -68,6 +68,33 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `download without checksum becomes unverified`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("unverified"),
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = null,
+            ),
+        )
+
+        val finalState = withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Unverified }
+        }
+
+        assertEquals(DownloadState.Unverified, finalState)
+        assertEquals(DownloadState.Unverified, store.updates.last().state)
+    }
+
+    @Test
     fun `checksum mismatch becomes failed state`() = runTest {
         server.enqueue(MockResponse(code = 200, body = "abc"))
         server.start()
@@ -973,7 +1000,7 @@ class SimpleDownloadEngineTest {
 
     private fun samplePackage(
         url: String,
-        md5: String,
+        md5: String?,
     ): OtaPackage =
         OtaPackage(
             versionName = "test",

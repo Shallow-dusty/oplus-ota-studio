@@ -24,7 +24,8 @@ class DownloadWorkerExecutorAdapter(
 object DownloadWorkerExecutionMapper {
     fun fromState(state: DownloadState): DownloadWorkerExecutionResult =
         when (state) {
-            DownloadState.Verified -> DownloadWorkerExecutionResult.Succeeded
+            DownloadState.Verified,
+            DownloadState.Unverified -> DownloadWorkerExecutionResult.Succeeded
             is DownloadState.Retrying -> DownloadWorkerExecutionResult.Retry
             is DownloadState.Failed ->
                 if (state.category.isRetriable && state.retriesRemaining > 0) {

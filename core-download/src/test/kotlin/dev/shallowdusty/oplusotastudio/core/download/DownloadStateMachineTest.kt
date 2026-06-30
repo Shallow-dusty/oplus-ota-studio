@@ -72,6 +72,13 @@ class DownloadStateMachineTest {
     }
 
     @Test
+    fun `completed task with no checksum becomes unverified`() {
+        val unverified = machine.verificationUnavailable(DownloadState.Verifying)
+
+        assertEquals(DownloadState.Unverified, unverified)
+    }
+
+    @Test
     fun `checksum mismatch becomes terminal failed state`() {
         val failed = machine.verificationFailed(
             current = DownloadState.Verifying,

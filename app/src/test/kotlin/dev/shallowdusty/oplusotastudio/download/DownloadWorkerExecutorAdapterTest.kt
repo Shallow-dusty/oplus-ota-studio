@@ -22,6 +22,18 @@ class DownloadWorkerExecutorAdapterTest {
     }
 
     @Test
+    fun `returns success when stored task is unverified`() = runTest {
+        val executor = DownloadWorkerExecutorAdapter {
+            DownloadState.Unverified
+        }
+
+        assertEquals(
+            DownloadWorkerExecutionResult.Succeeded,
+            executor.execute("task-1"),
+        )
+    }
+
+    @Test
     fun `returns retry when stored task reaches retriable state`() = runTest {
         val executor = DownloadWorkerExecutorAdapter {
             DownloadState.Retrying(

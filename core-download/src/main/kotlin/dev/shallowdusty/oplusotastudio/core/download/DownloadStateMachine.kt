@@ -58,6 +58,12 @@ class DownloadStateMachine {
             else -> current
         }
 
+    fun verificationUnavailable(current: DownloadState): DownloadState =
+        when (current) {
+            DownloadState.Verifying -> DownloadState.Unverified
+            else -> current
+        }
+
     fun verificationFailed(current: DownloadState, raw: String?): DownloadState =
         when (current) {
             DownloadState.Verifying -> DownloadState.Failed(
