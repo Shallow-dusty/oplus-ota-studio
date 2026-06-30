@@ -524,6 +524,47 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `execute stored task reuses existing in memory task row`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val tempRoot = testTempRoot("execute-stored-task-deduplicate")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = DownloadState.Queued,
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        engine.executeStoredTask("task-1")
+        engine.executeStoredTask("task-1")
+
+        assertEquals(
+            listOf("task-1"),
+            engine.observeAll().first().map { it.taskId },
+        )
+    }
+
+    @Test
     fun `keeps later downloads queued until active download finishes`() = runTest {
         val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {

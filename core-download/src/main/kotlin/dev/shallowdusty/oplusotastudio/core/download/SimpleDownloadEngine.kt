@@ -112,7 +112,7 @@ class SimpleDownloadEngine(
             tempFile = File(storedTask.tempFilePath),
             storedTask = storedTask,
         )
-        tasks.value = tasks.value + task
+        tasks.value = tasks.value.filterNot { it.taskId == taskId } + task
         return task.runToTerminal()
     }
 
