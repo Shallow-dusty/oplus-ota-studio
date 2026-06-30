@@ -303,6 +303,7 @@ class SimpleDownloadEngine(
                 finalFilePath = promoted.finalFilePath,
                 updatedAtMs = nowMs(),
             )
+            tempFile.delete()
         }
 
         private fun storagePreflightFailure(): DownloadStoragePreflightResult.Failed? {

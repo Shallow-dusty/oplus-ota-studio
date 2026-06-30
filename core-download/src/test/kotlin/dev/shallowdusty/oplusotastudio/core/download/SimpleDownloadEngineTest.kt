@@ -196,6 +196,7 @@ class SimpleDownloadEngineTest {
 
         assertEquals(task.taskId, promoter.promotions.single().taskId)
         assertEquals(tempRoot.resolve("${task.taskId}.zip.part"), promoter.promotions.single().sourceFile)
+        assertFalse(tempRoot.resolve("${task.taskId}.zip.part").exists())
         assertEquals(
             FinalPathUpdate(task.taskId, "content://downloads/pkg.zip"),
             store.finalPaths.single(),
