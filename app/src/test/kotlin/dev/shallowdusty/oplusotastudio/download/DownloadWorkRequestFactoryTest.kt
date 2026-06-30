@@ -16,6 +16,7 @@ class DownloadWorkRequestFactoryTest {
         )
 
         assertEquals(NetworkType.UNMETERED, request.workSpec.constraints.requiredNetworkType)
+        assertTrue(request.workSpec.constraints.requiresBatteryNotLow())
         assertEquals("task-1", request.workSpec.input.getString(DownloadWorker.TaskIdKey))
         assertTrue(request.tags.contains(DownloadWorker.WorkTag))
     }

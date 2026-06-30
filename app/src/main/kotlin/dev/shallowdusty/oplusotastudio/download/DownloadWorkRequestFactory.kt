@@ -23,6 +23,7 @@ class DownloadWorkRequestFactory {
                             NetworkType.CONNECTED
                         },
                     )
+                    .setRequiresBatteryNotLow(true)
                     .build(),
             )
             .setInputData(workDataOf(DownloadWorker.TaskIdKey to taskId))
