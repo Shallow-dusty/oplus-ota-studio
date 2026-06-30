@@ -18,8 +18,10 @@ import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkEnqueuer
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
+import dev.shallowdusty.oplusotastudio.download.DownloadTaskWorkScheduler
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutionResult
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
+import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,6 +56,17 @@ class AppGraphTest {
         val graph = AppGraph(downloadTempRoot = File("build/tmp/app-graph-test"))
 
         assertInstanceOf(SimpleDownloadEngine::class.java, graph.downloadEngine)
+    }
+
+    @Test
+    fun `uses work scheduled download engine when scheduler is provided`() {
+        val graph = AppGraph(
+            downloadTempRoot = File("build/tmp/app-graph-scheduled-engine-test"),
+            downloadTaskStore = RecordingDownloadTaskStore(),
+            downloadWorkScheduler = NoOpDownloadTaskWorkScheduler(),
+        )
+
+        assertInstanceOf(WorkScheduledDownloadEngine::class.java, graph.downloadEngine)
     }
 
     @Test
@@ -210,6 +223,10 @@ class AppGraphTest {
 
     private class NoOpDownloadWorkEnqueuer : DownloadWorkEnqueuer {
         override fun enqueue(request: OneTimeWorkRequest) = Unit
+    }
+
+    private class NoOpDownloadTaskWorkScheduler : DownloadTaskWorkScheduler {
+        override suspend fun schedule(taskId: String) = Unit
     }
 
     private class NoOpDownloadWorkerExecutor : DownloadWorkerExecutor {

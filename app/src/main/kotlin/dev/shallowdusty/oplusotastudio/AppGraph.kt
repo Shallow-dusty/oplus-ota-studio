@@ -14,9 +14,10 @@ import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.core.ota.OkHttpOtaTransport
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
-import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
+import dev.shallowdusty.oplusotastudio.download.DownloadTaskWorkScheduler
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutorAdapter
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
+import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.fake.FakePackageRepository
@@ -40,7 +41,7 @@ class AppGraph(
     private val downloadFilePromoter: DownloadFilePromoter? = null,
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
     private val downloadTempFileJanitor: DownloadTempFileJanitor? = null,
-    val downloadWorkScheduler: DownloadWorkScheduler? = null,
+    val downloadWorkScheduler: DownloadTaskWorkScheduler? = null,
     downloadWorkerExecutor: DownloadWorkerExecutor? = null,
 ) {
     val deviceDetector: DeviceDetector = AndroidDeviceDetector()
@@ -56,7 +57,16 @@ class AppGraph(
                 storageSnapshotProvider = storageSnapshotProvider,
             )
         }
-    val downloadEngine: DownloadEngine = realDownloadEngine ?: FakeDownloadEngine()
+    val downloadEngine: DownloadEngine =
+        if (downloadTempRoot != null && downloadTaskStore != null && downloadWorkScheduler != null) {
+            WorkScheduledDownloadEngine(
+                taskStore = downloadTaskStore,
+                scheduler = downloadWorkScheduler,
+                tempRoot = downloadTempRoot,
+            )
+        } else {
+            realDownloadEngine ?: FakeDownloadEngine()
+        }
     val downloadWorkerExecutor: DownloadWorkerExecutor? =
         downloadWorkerExecutor ?: realDownloadEngine?.let { engine ->
             DownloadWorkerExecutorAdapter(engine::executeStoredTask)

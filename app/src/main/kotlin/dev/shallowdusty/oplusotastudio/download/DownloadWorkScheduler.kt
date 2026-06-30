@@ -9,12 +9,16 @@ class DownloadWorkScheduler(
     private val preferencesStore: DownloadPreferencesStore,
     private val enqueuer: DownloadWorkEnqueuer,
     private val requestFactory: DownloadWorkRequestFactory = DownloadWorkRequestFactory(),
-) {
+) : DownloadTaskWorkScheduler {
 
-    suspend fun schedule(taskId: String) {
+    override suspend fun schedule(taskId: String) {
         val preferences = preferencesStore.preferences.first()
         enqueuer.enqueue(requestFactory.create(taskId, preferences))
     }
+}
+
+interface DownloadTaskWorkScheduler {
+    suspend fun schedule(taskId: String)
 }
 
 interface DownloadWorkEnqueuer {
