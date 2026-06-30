@@ -279,6 +279,46 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `executes persisted queued task by id`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val tempRoot = testTempRoot("execute-stored-task")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = DownloadState.Queued,
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val finalState = engine.executeStoredTask("task-1")
+
+        assertEquals(DownloadState.Verified, finalState)
+        assertTrue(store.created.isEmpty())
+        assertEquals("abc", tempFile.readText())
+        assertEquals(DownloadState.Verified, store.updates.last().state)
+    }
+
+    @Test
     fun `keeps later downloads queued until active download finishes`() = runTest {
         val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {

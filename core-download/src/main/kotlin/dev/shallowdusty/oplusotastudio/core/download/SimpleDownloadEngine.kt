@@ -77,6 +77,23 @@ class SimpleDownloadEngine(
 
     override fun observeAll(): Flow<List<DownloadTask>> = tasks.asStateFlow()
 
+    suspend fun executeStoredTask(taskId: String): DownloadState {
+        val storedTask = taskStore?.getTask(taskId)
+            ?: return DownloadState.Failed(
+                category = OtaErrorCategory.File,
+                retriesRemaining = 0,
+                raw = "Download task not found: $taskId",
+            )
+        val task = SimpleDownloadTask(
+            taskId = storedTask.taskId,
+            pkg = storedTask.pkg,
+            tempFile = File(storedTask.tempFilePath),
+            storedTask = storedTask,
+        )
+        tasks.value = tasks.value + task
+        return task.runToTerminal()
+    }
+
     private inner class SimpleDownloadTask(
         override val taskId: String,
         val pkg: OtaPackage,
@@ -89,12 +106,17 @@ class SimpleDownloadEngine(
 
         fun start() {
             job = scope.launch {
-                try {
-                    runDownload()
-                } finally {
-                    finishTask(this@SimpleDownloadTask)
-                }
+                runToTerminal()
             }
+        }
+
+        suspend fun runToTerminal(): DownloadState {
+            try {
+                runDownload()
+            } finally {
+                finishTask(this@SimpleDownloadTask)
+            }
+            return _state.value
         }
 
         override suspend fun pause() {
