@@ -13,7 +13,7 @@ class DownloadWorker(
     override suspend fun doWork(): Result =
         DownloadWorkerResultPolicy.resultFor(
             taskId = inputData.getString(TaskIdKey),
-            executionBackendAvailable = false,
+            executionResult = null,
         )
 
     companion object {
@@ -22,13 +22,28 @@ class DownloadWorker(
     }
 }
 
+interface DownloadWorkerExecutor {
+    suspend fun execute(taskId: String): DownloadWorkerExecutionResult
+}
+
+enum class DownloadWorkerExecutionResult {
+    Succeeded,
+    Retry,
+    Failed,
+}
+
 object DownloadWorkerResultPolicy {
     fun resultFor(
         taskId: String?,
-        executionBackendAvailable: Boolean,
+        executionResult: DownloadWorkerExecutionResult?,
     ): ListenableWorker.Result {
         if (taskId.isNullOrBlank()) return ListenableWorker.Result.failure()
-        if (!executionBackendAvailable) return ListenableWorker.Result.failure()
-        return ListenableWorker.Result.success()
+        return when (executionResult) {
+            DownloadWorkerExecutionResult.Succeeded -> ListenableWorker.Result.success()
+            DownloadWorkerExecutionResult.Retry -> ListenableWorker.Result.retry()
+            DownloadWorkerExecutionResult.Failed,
+            null,
+            -> ListenableWorker.Result.failure()
+        }
     }
 }
