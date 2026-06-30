@@ -28,6 +28,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -146,6 +147,13 @@ class AppGraphTest {
         val graph = AppGraph(downloadWorkerExecutor = executor)
 
         assertSame(executor, graph.downloadWorkerExecutor)
+    }
+
+    @Test
+    fun `creates download worker executor for real download engine`() {
+        val graph = AppGraph(downloadTempRoot = File("build/tmp/app-graph-worker-executor-test"))
+
+        assertNotNull(graph.downloadWorkerExecutor)
     }
 
     @Test

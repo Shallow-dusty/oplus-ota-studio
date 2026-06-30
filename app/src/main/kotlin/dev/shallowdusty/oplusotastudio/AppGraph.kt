@@ -15,6 +15,7 @@ import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.core.ota.OkHttpOtaTransport
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutorAdapter
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadPreferencesStore
@@ -40,22 +41,26 @@ class AppGraph(
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
     private val downloadTempFileJanitor: DownloadTempFileJanitor? = null,
     val downloadWorkScheduler: DownloadWorkScheduler? = null,
-    val downloadWorkerExecutor: DownloadWorkerExecutor? = null,
+    downloadWorkerExecutor: DownloadWorkerExecutor? = null,
 ) {
     val deviceDetector: DeviceDetector = AndroidDeviceDetector()
     val otaLookupService: OtaLookupService = LegacyOtaLookupService(
         transport = OkHttpOtaTransport(),
     )
-    val downloadEngine: DownloadEngine = downloadTempRoot
-        ?.let {
+    private val realDownloadEngine: SimpleDownloadEngine? = downloadTempRoot
+        ?.let { tempRoot ->
             SimpleDownloadEngine(
-                tempRoot = it,
+                tempRoot = tempRoot,
                 taskStore = downloadTaskStore,
                 filePromoter = downloadFilePromoter,
                 storageSnapshotProvider = storageSnapshotProvider,
             )
         }
-        ?: FakeDownloadEngine()
+    val downloadEngine: DownloadEngine = realDownloadEngine ?: FakeDownloadEngine()
+    val downloadWorkerExecutor: DownloadWorkerExecutor? =
+        downloadWorkerExecutor ?: realDownloadEngine?.let { engine ->
+            DownloadWorkerExecutorAdapter(engine::executeStoredTask)
+        }
 
     suspend fun cleanOrphanedDownloadParts(): DownloadTempFileJanitorResult? {
         val store = downloadTaskStore ?: return null
