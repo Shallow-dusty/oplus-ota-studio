@@ -127,6 +127,74 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `throttles small progress updates while downloading`() = runTest {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .body("abc")
+                .throttleBody(1, 10, TimeUnit.MILLISECONDS)
+                .build(),
+        )
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("progress-throttle"),
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = "900150983cd24fb0d6963f7d28e17f72",
+            ),
+        )
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Verified }
+        }
+
+        val runningUpdates = store.updates
+            .map { it.state }
+            .filterIsInstance<DownloadState.Running>()
+        assertEquals(listOf(0L), runningUpdates.map { it.downloadedBytes })
+    }
+
+    @Test
+    fun `emits progress after each mebibyte downloaded`() = runTest {
+        val body = "a".repeat(1024 * 1024) + "b"
+        server.enqueue(MockResponse(code = 200, body = body))
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("progress-mebibyte"),
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = "b67a5f55dade2839f62150d7353fdf03",
+            ),
+        )
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Verified }
+        }
+
+        val runningUpdates = store.updates
+            .map { it.state }
+            .filterIsInstance<DownloadState.Running>()
+            .map { it.downloadedBytes }
+        assertEquals(2, runningUpdates.size)
+        assertEquals(0L, runningUpdates.first())
+        assertTrue(runningUpdates.last() >= 1024L * 1024L)
+    }
+
+    @Test
     fun `persists resume metadata from response headers`() = runTest {
         server.enqueue(
             MockResponse(

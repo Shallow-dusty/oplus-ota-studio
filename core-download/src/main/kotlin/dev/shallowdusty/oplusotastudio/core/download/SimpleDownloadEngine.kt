@@ -239,6 +239,8 @@ class SimpleDownloadEngine(
                 }
                 var downloaded = if (appendPartial) rangeStart else 0L
                 updateState(DownloadState.Running(downloaded, targetSize, null))
+                var lastProgressUpdateBytes = downloaded
+                var lastProgressUpdateAtMs = nowMs()
 
                 response.body.byteStream().use { input ->
                     FileOutputStream(tempFile, appendPartial).use { output ->
@@ -248,7 +250,19 @@ class SimpleDownloadEngine(
                             if (read == -1) break
                             output.write(buffer, 0, read)
                             downloaded += read
-                            updateState(DownloadState.Running(downloaded, targetSize, null))
+                            val nowMs = nowMs()
+                            if (
+                                shouldEmitProgressUpdate(
+                                    downloadedBytes = downloaded,
+                                    lastProgressUpdateBytes = lastProgressUpdateBytes,
+                                    nowMs = nowMs,
+                                    lastProgressUpdateAtMs = lastProgressUpdateAtMs,
+                                )
+                            ) {
+                                updateState(DownloadState.Running(downloaded, targetSize, null))
+                                lastProgressUpdateBytes = downloaded
+                                lastProgressUpdateAtMs = nowMs
+                            }
                             if (isUserStopped()) return DownloadAttemptOutcome.Finished
                         }
                     }
@@ -295,6 +309,15 @@ class SimpleDownloadEngine(
 
         private fun isUserStopped(): Boolean =
             pauseRequested || _state.value is DownloadState.Paused || _state.value == DownloadState.Canceled
+
+        private fun shouldEmitProgressUpdate(
+            downloadedBytes: Long,
+            lastProgressUpdateBytes: Long,
+            nowMs: Long,
+            lastProgressUpdateAtMs: Long,
+        ): Boolean =
+            downloadedBytes - lastProgressUpdateBytes >= ProgressUpdateMinBytes ||
+                nowMs - lastProgressUpdateAtMs >= ProgressUpdateMinIntervalMs
 
         private suspend fun retryOrFinish(
             outcome: DownloadAttemptOutcome.Failed,
@@ -429,6 +452,11 @@ class SimpleDownloadEngine(
 
     private fun File.truncateTo(bytes: Long) {
         RandomAccessFile(this, "rw").use { it.setLength(bytes) }
+    }
+
+    private companion object {
+        const val ProgressUpdateMinBytes = 1024L * 1024L
+        const val ProgressUpdateMinIntervalMs = 250L
     }
 }
 
