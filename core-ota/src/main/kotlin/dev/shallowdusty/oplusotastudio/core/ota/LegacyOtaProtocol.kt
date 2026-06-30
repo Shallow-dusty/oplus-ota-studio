@@ -38,11 +38,7 @@ class LegacyOtaProtocol(
 
     fun parseResponse(rawXml: String, sourceHost: String): OtaLookupResult =
         runCatching {
-            val document = DocumentBuilderFactory.newInstance()
-                .apply {
-                    isIgnoringComments = true
-                    isCoalescing = true
-                }
+            val document = secureDocumentBuilderFactory()
                 .newDocumentBuilder()
                 .parse(InputSource(StringReader(rawXml)))
 
@@ -83,6 +79,18 @@ class LegacyOtaProtocol(
 
     private fun encode(value: String): String =
         URLEncoder.encode(value, Charsets.UTF_8.name())
+
+    private fun secureDocumentBuilderFactory(): DocumentBuilderFactory =
+        DocumentBuilderFactory.newInstance().apply {
+            isIgnoringComments = true
+            isCoalescing = true
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+        }
 }
 
 private fun org.w3c.dom.Document.text(tagName: String): String? {
