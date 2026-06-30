@@ -50,6 +50,7 @@ class WorkScheduledDownloadEngine(
                 }
 
             override suspend fun pause() {
+                scheduler.cancel(taskId)
                 taskStore.updateState(
                     taskId = taskId,
                     state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),

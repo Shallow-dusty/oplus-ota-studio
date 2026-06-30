@@ -122,6 +122,37 @@ class WorkScheduledDownloadEngineTest {
         assertEquals(DownloadState.Queued, task.state.first())
     }
 
+    @Test
+    fun `pause cancels work and keeps stored task paused`() = runTest {
+        val store = RecordingDownloadTaskStore(
+            initialTasks = listOf(
+                storedTask(
+                    taskId = "task-1",
+                    state = DownloadState.Running(
+                        downloadedBytes = 5L,
+                        targetSize = 10L,
+                        speedBytesPerSec = null,
+                    ),
+                ),
+            ),
+        )
+        val scheduler = RecordingDownloadWorkScheduler()
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/pause"),
+        )
+        val task = engine.observeAll().first().single()
+
+        task.pause()
+
+        assertEquals(listOf("task-1"), scheduler.canceled)
+        assertEquals(
+            DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+            task.state.first(),
+        )
+    }
+
     private fun samplePackage(): OtaPackage =
         OtaPackage(
             versionName = "test",
