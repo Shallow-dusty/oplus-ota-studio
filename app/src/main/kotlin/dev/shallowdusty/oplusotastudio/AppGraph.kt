@@ -7,6 +7,7 @@ import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitorResu
 import dev.shallowdusty.oplusotastudio.core.download.SimpleDownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
+import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
@@ -14,6 +15,7 @@ import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.core.ota.OkHttpOtaTransport
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadEngine
+import dev.shallowdusty.oplusotastudio.fake.FakeDownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.fake.FakePackageRepository
 import java.io.File
 import kotlinx.coroutines.flow.first
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.first
 class AppGraph(
     private val downloadTempRoot: File? = null,
     val packageRepository: PackageRepository = FakePackageRepository(),
+    val downloadPreferencesStore: DownloadPreferencesStore = FakeDownloadPreferencesStore(),
     private val downloadTaskStore: DownloadTaskStore? = null,
     private val downloadFilePromoter: DownloadFilePromoter? = null,
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,

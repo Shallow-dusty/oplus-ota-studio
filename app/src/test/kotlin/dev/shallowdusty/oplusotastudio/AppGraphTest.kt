@@ -5,6 +5,8 @@ import dev.shallowdusty.oplusotastudio.core.download.DownloadStorageSnapshot
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
 import dev.shallowdusty.oplusotastudio.core.download.PromotedDownloadFile
 import dev.shallowdusty.oplusotastudio.core.download.SimpleDownloadEngine
+import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferences
+import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
@@ -15,6 +17,7 @@ import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import java.io.File
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -114,6 +117,14 @@ class AppGraphTest {
     }
 
     @Test
+    fun `uses supplied download preferences store`() {
+        val store = RecordingDownloadPreferencesStore()
+        val graph = AppGraph(downloadPreferencesStore = store)
+
+        assertSame(store, graph.downloadPreferencesStore)
+    }
+
+    @Test
     fun `cleans orphaned download parts while keeping stored task parts`() = runTest {
         val tempRoot = testTempRoot("app-graph-janitor")
         val activePart = tempRoot.resolve("active.zip.part").also { it.writeText("active") }
@@ -146,6 +157,15 @@ class AppGraphTest {
             pkg: OtaPackage,
             sourceFile: File,
         ): PromotedDownloadFile = PromotedDownloadFile(sourceFile.absolutePath)
+    }
+
+    private class RecordingDownloadPreferencesStore : DownloadPreferencesStore {
+        override val preferences: Flow<DownloadPreferences> =
+            MutableStateFlow(DownloadPreferences())
+
+        override suspend fun setWifiOnly(enabled: Boolean) = Unit
+
+        override suspend fun setBatteryPauseThresholdPercent(percent: Int) = Unit
     }
 
     private fun testTempRoot(name: String): File {

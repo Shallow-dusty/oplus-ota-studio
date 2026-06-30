@@ -6,6 +6,7 @@ import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
 import dev.shallowdusty.oplusotastudio.core.storage.OtaStudioDatabase
 import dev.shallowdusty.oplusotastudio.core.storage.RoomDownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.storage.RoomPackageRepository
+import dev.shallowdusty.oplusotastudio.core.storage.createDownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.core.storage.createOtaStudioDatabase
 import dev.shallowdusty.oplusotastudio.download.AndroidDownloadStorageSnapshotProvider
 import dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoter
@@ -28,6 +29,7 @@ class OtaStudioApplication : Application() {
         AppGraph(
             downloadTempRoot = downloadTempRoot,
             packageRepository = RoomPackageRepository(database.historyDao()),
+            downloadPreferencesStore = createDownloadPreferencesStore(this),
             downloadTaskStore = RoomDownloadTaskStore(database.downloadTaskDao()),
             downloadFilePromoter = AndroidMediaStoreDownloadFilePromoter(this),
             storageSnapshotProvider = AndroidDownloadStorageSnapshotProvider(this, downloadTempRoot),

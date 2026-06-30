@@ -3,6 +3,8 @@ package dev.shallowdusty.oplusotastudio.fake
 import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DeviceProfile
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
+import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferences
+import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
@@ -89,4 +91,19 @@ class FakePackageRepository : PackageRepository {
     }
 
     override fun observeHistory(): Flow<List<HistoryEntry>> = history
+}
+
+/** TODO core-storage: replace with the real DataStore-backed preferences store. */
+class FakeDownloadPreferencesStore : DownloadPreferencesStore {
+    private val state = MutableStateFlow(DownloadPreferences())
+
+    override val preferences: Flow<DownloadPreferences> = state
+
+    override suspend fun setWifiOnly(enabled: Boolean) {
+        state.value = state.value.copy(wifiOnly = enabled)
+    }
+
+    override suspend fun setBatteryPauseThresholdPercent(percent: Int) {
+        state.value = state.value.copy(batteryPauseThresholdPercent = percent)
+    }
 }
