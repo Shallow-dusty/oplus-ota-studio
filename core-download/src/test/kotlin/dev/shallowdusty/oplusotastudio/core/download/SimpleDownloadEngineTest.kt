@@ -6,7 +6,12 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
 import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
@@ -271,6 +276,52 @@ class SimpleDownloadEngineTest {
             },
         )
         assertEquals(DownloadState.Verified, store.updates.last().state)
+    }
+
+    @Test
+    fun `keeps later downloads queued until active download finishes`() = runTest {
+        val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .body("abc")
+                    .bodyDelay(750, TimeUnit.MILLISECONDS)
+                    .build(),
+            )
+            server.enqueue(MockResponse(code = 200, body = "abc"))
+            server.start()
+            val engine = SimpleDownloadEngine(
+                client = OkHttpClient(),
+                tempRoot = testTempRoot("serial-queue"),
+                scope = engineScope,
+            )
+
+            engine.enqueue(
+                samplePackage(
+                    url = server.url("/first.zip").toString(),
+                    md5 = "900150983cd24fb0d6963f7d28e17f72",
+                ),
+            )
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (server.requestCount < 1 && System.nanoTime() < deadline) {
+                Thread.sleep(10)
+            }
+            assertEquals(1, server.requestCount)
+
+            val second = engine.enqueue(
+                samplePackage(
+                    url = server.url("/second.zip").toString(),
+                    md5 = "900150983cd24fb0d6963f7d28e17f72",
+                ),
+            )
+            Thread.sleep(100)
+
+            assertEquals(DownloadState.Queued, second.state.first())
+            assertEquals(1, server.requestCount)
+        } finally {
+            engineScope.cancel()
+        }
     }
 
     @Test

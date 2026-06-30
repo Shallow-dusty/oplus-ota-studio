@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -42,6 +44,9 @@ class SimpleDownloadEngine(
 ) : DownloadEngine {
 
     private val tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+    private val queueMutex = Mutex()
+    private val queuedTasks = ArrayDeque<SimpleDownloadTask>()
+    private var activeTask: SimpleDownloadTask? = null
 
     override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
         tempRoot.mkdirs()
@@ -63,7 +68,10 @@ class SimpleDownloadEngine(
             storedTask = storedTask,
         )
         tasks.value = tasks.value + task
-        task.start()
+        queueMutex.withLock {
+            queuedTasks.addLast(task)
+            startNextTaskIfIdle()
+        }
         return task
     }
 
@@ -81,7 +89,11 @@ class SimpleDownloadEngine(
 
         fun start() {
             job = scope.launch {
-                runDownload()
+                try {
+                    runDownload()
+                } finally {
+                    finishTask(this@SimpleDownloadTask)
+                }
             }
         }
 
@@ -96,6 +108,7 @@ class SimpleDownloadEngine(
         }
 
         override suspend fun cancel() {
+            removeQueuedTask(this)
             job?.cancel()
             updateState(DownloadState.Canceled)
             tempFile.delete()
@@ -326,6 +339,28 @@ class SimpleDownloadEngine(
                 responseLastModified != null &&
                 lastModified != responseLastModified
             return etagChanged || lastModifiedChanged
+        }
+    }
+
+    private fun startNextTaskIfIdle() {
+        if (activeTask != null) return
+        val next = queuedTasks.removeFirstOrNull() ?: return
+        activeTask = next
+        next.start()
+    }
+
+    private suspend fun finishTask(task: SimpleDownloadTask) {
+        queueMutex.withLock {
+            if (activeTask === task) {
+                activeTask = null
+                startNextTaskIfIdle()
+            }
+        }
+    }
+
+    private suspend fun removeQueuedTask(task: SimpleDownloadTask) {
+        queueMutex.withLock {
+            queuedTasks.remove(task)
         }
     }
 
