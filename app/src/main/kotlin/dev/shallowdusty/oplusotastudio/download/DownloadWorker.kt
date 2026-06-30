@@ -12,6 +12,9 @@ class DownloadWorker(
 
     override suspend fun doWork(): Result {
         val taskId = inputData.getString(TaskIdKey)
+        taskId
+            ?.takeUnless { it.isBlank() }
+            ?.let { setForeground(DownloadForegroundInfoFactory(applicationContext).create(it)) }
         val executionResult = taskId
             ?.takeUnless { it.isBlank() }
             ?.let {
