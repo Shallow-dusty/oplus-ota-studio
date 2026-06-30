@@ -38,6 +38,35 @@ class DownloadForegroundManifestTest {
         )
     }
 
+    @Test
+    fun `disables cleartext traffic through network security config`() {
+        val application = manifest()
+            .getElementsByTagName("application")
+            .item(0)
+
+        assertEquals(
+            "false",
+            application.attributes.getNamedItem("android:usesCleartextTraffic").nodeValue,
+        )
+        assertEquals(
+            "@xml/network_security_config",
+            application.attributes.getNamedItem("android:networkSecurityConfig").nodeValue,
+        )
+
+        val configFile = File("src/main/res/xml/network_security_config.xml")
+        assertTrue(configFile.exists())
+        val config = DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder()
+            .parse(configFile)
+        val baseConfig = config.getElementsByTagName("base-config").item(0)
+
+        assertEquals(
+            "false",
+            baseConfig.attributes.getNamedItem("cleartextTrafficPermitted").nodeValue,
+        )
+        assertEquals(0, config.getElementsByTagName("pin-set").length)
+    }
+
     private fun manifest() =
         DocumentBuilderFactory.newInstance()
             .newDocumentBuilder()

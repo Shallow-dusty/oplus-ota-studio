@@ -13,8 +13,10 @@
     <application
         android:name=".OtaStudioApplication"
         android:label="OPlus OTA Studio"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name=".MainActivity"
