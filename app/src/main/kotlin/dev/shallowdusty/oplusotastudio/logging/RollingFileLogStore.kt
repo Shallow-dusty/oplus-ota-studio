@@ -13,15 +13,15 @@ class RollingFileLogStore(
     private val logDir: File,
     private val maxBytes: Long = 5L * 1024L * 1024L,
     private val redactor: (String) -> String = AppLogRedactor::redact,
-) {
+) : AppLogSink {
     private val logFile: File
         get() = logDir.resolve("app.log")
 
-    fun append(
+    override fun append(
         level: AppLogLevel,
         tag: String,
         message: String,
-        nowMs: Long = System.currentTimeMillis(),
+        nowMs: Long,
     ) {
         logDir.mkdirs()
         logFile.appendText("${nowMs}\t${level.wireName}\t${tag}\t${redactor(message)}\n")
