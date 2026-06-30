@@ -21,6 +21,7 @@ import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
 import dev.shallowdusty.oplusotastudio.download.DownloadTaskWorkScheduler
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutionResult
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
+import dev.shallowdusty.oplusotastudio.download.SerialDownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
 import java.io.File
 import kotlinx.coroutines.flow.Flow
@@ -167,6 +168,13 @@ class AppGraphTest {
         val graph = AppGraph(downloadTempRoot = File("build/tmp/app-graph-worker-executor-test"))
 
         assertNotNull(graph.downloadWorkerExecutor)
+    }
+
+    @Test
+    fun `serializes real download worker executor`() {
+        val graph = AppGraph(downloadTempRoot = File("build/tmp/app-graph-serial-worker-executor-test"))
+
+        assertInstanceOf(SerialDownloadWorkerExecutor::class.java, graph.downloadWorkerExecutor)
     }
 
     @Test

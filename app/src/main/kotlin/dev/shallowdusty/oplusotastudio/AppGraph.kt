@@ -15,8 +15,9 @@ import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.core.ota.OkHttpOtaTransport
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import dev.shallowdusty.oplusotastudio.download.DownloadTaskWorkScheduler
-import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutorAdapter
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutorAdapter
+import dev.shallowdusty.oplusotastudio.download.SerialDownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadPreferencesStore
@@ -69,7 +70,9 @@ class AppGraph(
         }
     val downloadWorkerExecutor: DownloadWorkerExecutor? =
         downloadWorkerExecutor ?: realDownloadEngine?.let { engine ->
-            DownloadWorkerExecutorAdapter(engine::executeStoredTask)
+            SerialDownloadWorkerExecutor(
+                DownloadWorkerExecutorAdapter(engine::executeStoredTask),
+            )
         }
 
     suspend fun cleanOrphanedDownloadParts(): DownloadTempFileJanitorResult? {
