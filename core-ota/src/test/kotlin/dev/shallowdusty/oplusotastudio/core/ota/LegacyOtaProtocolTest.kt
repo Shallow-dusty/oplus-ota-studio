@@ -86,6 +86,28 @@ class LegacyOtaProtocolTest {
     }
 
     @Test
+    fun `rejects legacy package response with cleartext download url`() {
+        val xml = """
+            <root>
+              <Command>NEW_VERSION</Command>
+              <versionName>LE2120_14.0.0.1901(CN01)</versionName>
+              <type>full</type>
+              <size>6559817109</size>
+              <md5>5ae1e4d8101218d58c1da10092b22996</md5>
+              <url>http://example.invalid/oneplus9pro-cn-full.zip</url>
+            </root>
+        """.trimIndent()
+
+        val result = LegacyOtaProtocol().parseResponse(
+            rawXml = xml,
+            sourceHost = "example.invalid",
+        )
+
+        val error = assertInstanceOf(OtaLookupResult.Error::class.java, result)
+        assertEquals(dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Malformed, error.category)
+    }
+
+    @Test
     fun `rejects legacy response with doctype declarations`() {
         val xml = fixture("synthetic-legacy-oneplus9pro-cn-doctype.xml")
 

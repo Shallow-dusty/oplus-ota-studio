@@ -5,6 +5,7 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import java.io.StringReader
+import java.net.URI
 import java.net.URLEncoder
 import javax.xml.parsers.DocumentBuilderFactory
 import org.xml.sax.InputSource
@@ -65,6 +66,7 @@ class LegacyOtaProtocol(
             ?: return OtaLookupResult.Error(OtaErrorCategory.Malformed, rawXml)
         val url = document.text("url")
             ?: return OtaLookupResult.Error(OtaErrorCategory.Malformed, rawXml)
+        if (!url.isHttpsUrl()) return OtaLookupResult.Error(OtaErrorCategory.Malformed, rawXml)
 
         return OtaLookupResult.PackageFound(
             OtaPackage(
@@ -101,3 +103,9 @@ private fun org.w3c.dom.Document.text(tagName: String): String? {
     if (nodes.length == 0) return null
     return nodes.item(0).textContent.trim().takeIf { it.isNotEmpty() }
 }
+
+private fun String.isHttpsUrl(): Boolean =
+    runCatching {
+        val uri = URI(this)
+        uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()
+    }.getOrDefault(false)
