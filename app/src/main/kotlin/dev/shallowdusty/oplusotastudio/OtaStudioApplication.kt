@@ -2,6 +2,7 @@ package dev.shallowdusty.oplusotastudio
 
 import android.app.Application
 import android.os.Environment
+import androidx.work.WorkManager
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
 import dev.shallowdusty.oplusotastudio.core.storage.OtaStudioDatabase
 import dev.shallowdusty.oplusotastudio.core.storage.RoomDownloadTaskStore
@@ -10,6 +11,8 @@ import dev.shallowdusty.oplusotastudio.core.storage.createDownloadPreferencesSto
 import dev.shallowdusty.oplusotastudio.core.storage.createOtaStudioDatabase
 import dev.shallowdusty.oplusotastudio.download.AndroidDownloadStorageSnapshotProvider
 import dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoter
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
+import dev.shallowdusty.oplusotastudio.download.WorkManagerDownloadWorkEnqueuer
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,14 +29,21 @@ class OtaStudioApplication : Application() {
     val graph: AppGraph by lazy {
         val downloadTempRoots = downloadTempRoots()
         val downloadTempRoot = downloadTempRoots.first()
+        val downloadPreferencesStore = createDownloadPreferencesStore(this)
         AppGraph(
             downloadTempRoot = downloadTempRoot,
             packageRepository = RoomPackageRepository(database.historyDao()),
-            downloadPreferencesStore = createDownloadPreferencesStore(this),
+            downloadPreferencesStore = downloadPreferencesStore,
             downloadTaskStore = RoomDownloadTaskStore(database.downloadTaskDao()),
             downloadFilePromoter = AndroidMediaStoreDownloadFilePromoter(this),
             storageSnapshotProvider = AndroidDownloadStorageSnapshotProvider(this, downloadTempRoot),
             downloadTempFileJanitor = DownloadTempFileJanitor(downloadTempRoots),
+            downloadWorkScheduler = DownloadWorkScheduler(
+                preferencesStore = downloadPreferencesStore,
+                enqueuer = WorkManagerDownloadWorkEnqueuer(
+                    WorkManager.getInstance(this),
+                ),
+            ),
         )
     }
 

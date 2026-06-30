@@ -1,5 +1,6 @@
 package dev.shallowdusty.oplusotastudio
 
+import androidx.work.OneTimeWorkRequest
 import dev.shallowdusty.oplusotastudio.core.download.DownloadFilePromoter
 import dev.shallowdusty.oplusotastudio.core.download.DownloadStorageSnapshot
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
@@ -15,6 +16,8 @@ import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
 import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkEnqueuer
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -125,6 +128,17 @@ class AppGraphTest {
     }
 
     @Test
+    fun `uses supplied download work scheduler`() {
+        val scheduler = DownloadWorkScheduler(
+            preferencesStore = RecordingDownloadPreferencesStore(DownloadPreferences()),
+            enqueuer = NoOpDownloadWorkEnqueuer(),
+        )
+        val graph = AppGraph(downloadWorkScheduler = scheduler)
+
+        assertSame(scheduler, graph.downloadWorkScheduler)
+    }
+
+    @Test
     fun `cleans orphaned download parts while keeping stored task parts`() = runTest {
         val tempRoot = testTempRoot("app-graph-janitor")
         val activePart = tempRoot.resolve("active.zip.part").also { it.writeText("active") }
@@ -160,12 +174,24 @@ class AppGraphTest {
     }
 
     private class RecordingDownloadPreferencesStore : DownloadPreferencesStore {
+        constructor() : this(DownloadPreferences())
+
+        constructor(initialPreferences: DownloadPreferences) {
+            state.value = initialPreferences
+        }
+
+        private val state = MutableStateFlow(DownloadPreferences())
+
         override val preferences: Flow<DownloadPreferences> =
-            MutableStateFlow(DownloadPreferences())
+            state
 
         override suspend fun setWifiOnly(enabled: Boolean) = Unit
 
         override suspend fun setBatteryPauseThresholdPercent(percent: Int) = Unit
+    }
+
+    private class NoOpDownloadWorkEnqueuer : DownloadWorkEnqueuer {
+        override fun enqueue(request: OneTimeWorkRequest) = Unit
     }
 
     private fun testTempRoot(name: String): File {
