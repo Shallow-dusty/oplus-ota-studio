@@ -12,6 +12,10 @@ import kotlinx.coroutines.flow.Flow
 interface PackageRepository {
     /** A new successful lookup or completed download is recorded here. */
     suspend fun record(entry: HistoryEntry)
+
+    /** Mark the latest matching package row as downloaded after file promotion. */
+    suspend fun markDownloaded(packageName: String, downloadedAtMs: Long, localFilePath: String)
+
     fun observeHistory(): Flow<List<HistoryEntry>>
 }
 

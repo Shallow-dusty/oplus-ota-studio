@@ -3,8 +3,10 @@ package dev.shallowdusty.oplusotastudio.core.download
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
+import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
+import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
 import java.io.File
 import java.io.IOException
@@ -274,6 +276,7 @@ class SimpleDownloadEngineTest {
         server.start()
         val store = RecordingDownloadTaskStore()
         val promoter = RecordingDownloadFilePromoter("content://downloads/pkg.zip")
+        val packageRepository = RecordingPackageRepository()
         val tempRoot = testTempRoot("promoted")
         val engine = SimpleDownloadEngine(
             client = OkHttpClient(),
@@ -281,6 +284,7 @@ class SimpleDownloadEngineTest {
             scope = backgroundScope,
             taskStore = store,
             filePromoter = promoter,
+            packageRepository = packageRepository,
         )
 
         val task = engine.enqueue(
@@ -301,6 +305,9 @@ class SimpleDownloadEngineTest {
             FinalPathUpdate(task.taskId, "content://downloads/pkg.zip"),
             store.finalPaths.single(),
         )
+        assertEquals("test", packageRepository.downloaded.single().packageName)
+        assertEquals("content://downloads/pkg.zip", packageRepository.downloaded.single().localFilePath)
+        assertTrue(packageRepository.downloaded.single().downloadedAtMs > 0L)
     }
 
     @Test
@@ -1055,6 +1062,26 @@ class SimpleDownloadEngineTest {
         }
     }
 
+    private class RecordingPackageRepository : PackageRepository {
+        val downloaded = mutableListOf<DownloadedPackage>()
+
+        override suspend fun record(entry: HistoryEntry) = Unit
+
+        override suspend fun markDownloaded(
+            packageName: String,
+            downloadedAtMs: Long,
+            localFilePath: String,
+        ) {
+            downloaded += DownloadedPackage(
+                packageName = packageName,
+                downloadedAtMs = downloadedAtMs,
+                localFilePath = localFilePath,
+            )
+        }
+
+        override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(emptyList())
+    }
+
     private class RecordingDownloadTaskStore(
         private val existingTasks: Map<String, StoredDownloadTask> = emptyMap(),
     ) : DownloadTaskStore {
@@ -1107,4 +1134,10 @@ class SimpleDownloadEngineTest {
 
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = flowOf(emptyList())
     }
+
+    private data class DownloadedPackage(
+        val packageName: String,
+        val downloadedAtMs: Long,
+        val localFilePath: String,
+    )
 }

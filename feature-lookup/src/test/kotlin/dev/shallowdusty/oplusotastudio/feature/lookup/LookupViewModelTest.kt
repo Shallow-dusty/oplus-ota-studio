@@ -294,6 +294,12 @@ class LookupViewModelTest {
             recorded += entry
         }
 
+        override suspend fun markDownloaded(
+            packageName: String,
+            downloadedAtMs: Long,
+            localFilePath: String,
+        ) = Unit
+
         override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(recorded)
     }
 }

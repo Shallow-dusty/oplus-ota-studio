@@ -90,6 +90,19 @@ class FakePackageRepository : PackageRepository {
         history.value = history.value + entry
     }
 
+    override suspend fun markDownloaded(packageName: String, downloadedAtMs: Long, localFilePath: String) {
+        val target = history.value
+            .filter { it.packageName == packageName }
+            .maxByOrNull { it.lookedUpAtMs }
+        history.value = history.value.map { entry ->
+            if (entry.id == target?.id) {
+                entry.copy(downloadedAtMs = downloadedAtMs, localFilePath = localFilePath)
+            } else {
+                entry
+            }
+        }
+    }
+
     override fun observeHistory(): Flow<List<HistoryEntry>> = history
 }
 

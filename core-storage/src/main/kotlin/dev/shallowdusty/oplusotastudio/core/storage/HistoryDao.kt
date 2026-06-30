@@ -11,6 +11,20 @@ interface HistoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entry: HistoryEntity)
 
+    @Query(
+        """
+        UPDATE history
+        SET downloadedAtMs = :downloadedAtMs, localFilePath = :localFilePath
+        WHERE id = (
+            SELECT id FROM history
+            WHERE packageName = :packageName
+            ORDER BY lookedUpAtMs DESC
+            LIMIT 1
+        )
+        """,
+    )
+    suspend fun markDownloaded(packageName: String, downloadedAtMs: Long, localFilePath: String)
+
     @Query("SELECT * FROM history ORDER BY lookedUpAtMs DESC")
     fun observeAll(): Flow<List<HistoryEntity>>
 }

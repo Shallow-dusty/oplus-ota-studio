@@ -6,6 +6,7 @@ import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
+import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.isRetriable
 import java.io.File
@@ -36,6 +37,7 @@ class SimpleDownloadEngine(
     private val checksumVerifier: ChecksumVerifier = ChecksumVerifier(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val taskStore: DownloadTaskStore? = null,
+    private val packageRepository: PackageRepository? = null,
     private val resumeRequestPlanner: ResumeRequestPlanner = ResumeRequestPlanner(),
     private val filePromoter: DownloadFilePromoter? = null,
     private val storagePreflight: DownloadStoragePreflight = DownloadStoragePreflight(),
@@ -381,6 +383,11 @@ class SimpleDownloadEngine(
                 taskId = taskId,
                 finalFilePath = promoted.finalFilePath,
                 updatedAtMs = nowMs(),
+            )
+            packageRepository?.markDownloaded(
+                packageName = pkg.versionName,
+                downloadedAtMs = nowMs(),
+                localFilePath = promoted.finalFilePath,
             )
             tempFile.delete()
         }

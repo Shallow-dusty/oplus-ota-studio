@@ -56,6 +56,7 @@ class AppGraph(
             SimpleDownloadEngine(
                 tempRoot = tempRoot,
                 taskStore = downloadTaskStore,
+                packageRepository = packageRepository,
                 filePromoter = downloadFilePromoter,
                 storageSnapshotProvider = storageSnapshotProvider,
                 admissionGate = downloadAdmissionGate,

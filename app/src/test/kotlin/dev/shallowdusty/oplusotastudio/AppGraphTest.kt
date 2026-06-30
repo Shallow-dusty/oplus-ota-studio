@@ -201,6 +201,12 @@ class AppGraphTest {
     private class RecordingPackageRepository : PackageRepository {
         override suspend fun record(entry: HistoryEntry) = Unit
 
+        override suspend fun markDownloaded(
+            packageName: String,
+            downloadedAtMs: Long,
+            localFilePath: String,
+        ) = Unit
+
         override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(emptyList())
     }
 

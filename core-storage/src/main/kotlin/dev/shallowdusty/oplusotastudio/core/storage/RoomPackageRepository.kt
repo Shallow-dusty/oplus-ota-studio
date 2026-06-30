@@ -14,6 +14,18 @@ class RoomPackageRepository(
         historyDao.upsert(entry.toEntity())
     }
 
+    override suspend fun markDownloaded(
+        packageName: String,
+        downloadedAtMs: Long,
+        localFilePath: String,
+    ) {
+        historyDao.markDownloaded(
+            packageName = packageName,
+            downloadedAtMs = downloadedAtMs,
+            localFilePath = localFilePath,
+        )
+    }
+
     override fun observeHistory(): Flow<List<HistoryEntry>> =
         historyDao.observeAll().map { rows ->
             rows.sortedByDescending { it.lookedUpAtMs }.map { it.toDomain() }
