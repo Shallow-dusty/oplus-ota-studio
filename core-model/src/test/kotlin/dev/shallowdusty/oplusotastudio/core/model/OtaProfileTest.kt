@@ -79,4 +79,40 @@ class OtaProfileTest {
         )
         assertFalse(profile.isLookupReady)
     }
+
+    @Test
+    fun `validation accepts hostname override`() {
+        val profile = OtaProfile(
+            model = "LE2123",
+            region = OtaRegion.Global,
+            otaVersion = "11.0.2.2.LE28AA",
+            hostOverride = "ota-override.example.invalid",
+        )
+
+        assertEquals(emptySet<OtaProfileValidationError>(), profile.validationErrors())
+        assertTrue(profile.isLookupReady)
+    }
+
+    @Test
+    fun `validation rejects malformed host override`() {
+        val profiles = listOf(
+            OtaProfile(
+                model = "LE2123",
+                region = OtaRegion.Global,
+                otaVersion = "11.0.2.2.LE28AA",
+                hostOverride = "https://ota.example.invalid/path",
+            ),
+            OtaProfile(
+                model = "LE2123",
+                region = OtaRegion.Global,
+                otaVersion = "11.0.2.2.LE28AA",
+                hostOverride = "ota host.example.invalid",
+            ),
+        )
+
+        profiles.forEach { profile ->
+            assertEquals(setOf(OtaProfileValidationError.InvalidHostOverride), profile.validationErrors())
+            assertFalse(profile.isLookupReady)
+        }
+    }
 }

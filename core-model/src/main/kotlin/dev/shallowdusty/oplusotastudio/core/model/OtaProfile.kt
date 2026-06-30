@@ -27,13 +27,30 @@ data class OtaProfile(
 enum class OtaProfileValidationError {
     MissingModel,
     MissingOtaVersion,
+    InvalidHostOverride,
 }
 
 fun OtaProfile.validationErrors(): Set<OtaProfileValidationError> =
     buildSet {
         if (model.isBlank()) add(OtaProfileValidationError.MissingModel)
         if (otaVersion.isBlank()) add(OtaProfileValidationError.MissingOtaVersion)
+        if (!hostOverride.isNullOrBlank() && !hostOverride.trim().isValidHostOverride()) {
+            add(OtaProfileValidationError.InvalidHostOverride)
+        }
     }
 
 val OtaProfile.isLookupReady: Boolean
     get() = validationErrors().isEmpty()
+
+private fun String.isValidHostOverride(): Boolean {
+    if (contains("://") || contains('/') || any(Char::isWhitespace)) return false
+    val labels = split('.')
+    if (labels.size < 2) return false
+    return labels.all { label ->
+        label.isNotEmpty() &&
+            label.length <= 63 &&
+            label.first().isLetterOrDigit() &&
+            label.last().isLetterOrDigit() &&
+            label.all { it.isLetterOrDigit() || it == '-' }
+    }
+}
