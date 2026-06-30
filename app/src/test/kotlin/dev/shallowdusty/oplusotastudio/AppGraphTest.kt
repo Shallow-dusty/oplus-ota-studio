@@ -18,6 +18,8 @@ import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkEnqueuer
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutionResult
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -139,6 +141,14 @@ class AppGraphTest {
     }
 
     @Test
+    fun `uses supplied download worker executor`() {
+        val executor = NoOpDownloadWorkerExecutor()
+        val graph = AppGraph(downloadWorkerExecutor = executor)
+
+        assertSame(executor, graph.downloadWorkerExecutor)
+    }
+
+    @Test
     fun `cleans orphaned download parts while keeping stored task parts`() = runTest {
         val tempRoot = testTempRoot("app-graph-janitor")
         val activePart = tempRoot.resolve("active.zip.part").also { it.writeText("active") }
@@ -192,6 +202,11 @@ class AppGraphTest {
 
     private class NoOpDownloadWorkEnqueuer : DownloadWorkEnqueuer {
         override fun enqueue(request: OneTimeWorkRequest) = Unit
+    }
+
+    private class NoOpDownloadWorkerExecutor : DownloadWorkerExecutor {
+        override suspend fun execute(taskId: String): DownloadWorkerExecutionResult =
+            DownloadWorkerExecutionResult.Failed
     }
 
     private fun testTempRoot(name: String): File {

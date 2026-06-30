@@ -15,6 +15,7 @@ import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
 import dev.shallowdusty.oplusotastudio.core.ota.OkHttpOtaTransport
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.fake.FakePackageRepository
@@ -39,6 +40,7 @@ class AppGraph(
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
     private val downloadTempFileJanitor: DownloadTempFileJanitor? = null,
     val downloadWorkScheduler: DownloadWorkScheduler? = null,
+    val downloadWorkerExecutor: DownloadWorkerExecutor? = null,
 ) {
     val deviceDetector: DeviceDetector = AndroidDeviceDetector()
     val otaLookupService: OtaLookupService = LegacyOtaLookupService(

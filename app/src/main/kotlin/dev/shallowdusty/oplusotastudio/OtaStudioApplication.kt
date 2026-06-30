@@ -12,6 +12,8 @@ import dev.shallowdusty.oplusotastudio.core.storage.createOtaStudioDatabase
 import dev.shallowdusty.oplusotastudio.download.AndroidDownloadStorageSnapshotProvider
 import dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoter
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
+import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutorProvider
 import dev.shallowdusty.oplusotastudio.download.WorkManagerDownloadWorkEnqueuer
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -19,7 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-class OtaStudioApplication : Application() {
+class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val database: OtaStudioDatabase by lazy {
@@ -46,6 +48,9 @@ class OtaStudioApplication : Application() {
             ),
         )
     }
+
+    override val downloadWorkerExecutor: DownloadWorkerExecutor?
+        get() = graph.downloadWorkerExecutor
 
     override fun onCreate() {
         super.onCreate()

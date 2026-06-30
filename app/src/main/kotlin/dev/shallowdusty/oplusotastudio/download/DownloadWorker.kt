@@ -10,11 +10,20 @@ class DownloadWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
 
-    override suspend fun doWork(): Result =
-        DownloadWorkerResultPolicy.resultFor(
-            taskId = inputData.getString(TaskIdKey),
-            executionResult = null,
+    override suspend fun doWork(): Result {
+        val taskId = inputData.getString(TaskIdKey)
+        val executionResult = taskId
+            ?.takeUnless { it.isBlank() }
+            ?.let {
+                (applicationContext as? DownloadWorkerExecutorProvider)
+                    ?.downloadWorkerExecutor
+                    ?.execute(it)
+            }
+        return DownloadWorkerResultPolicy.resultFor(
+            taskId = taskId,
+            executionResult = executionResult,
         )
+    }
 
     companion object {
         const val TaskIdKey = "task_id"
@@ -24,6 +33,10 @@ class DownloadWorker(
 
 interface DownloadWorkerExecutor {
     suspend fun execute(taskId: String): DownloadWorkerExecutionResult
+}
+
+interface DownloadWorkerExecutorProvider {
+    val downloadWorkerExecutor: DownloadWorkerExecutor?
 }
 
 enum class DownloadWorkerExecutionResult {
