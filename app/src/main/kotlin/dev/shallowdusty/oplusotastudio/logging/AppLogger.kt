@@ -4,6 +4,10 @@ interface AppLogSink {
     fun append(level: AppLogLevel, tag: String, message: String, nowMs: Long = System.currentTimeMillis())
 }
 
+object NoOpAppLogSink : AppLogSink {
+    override fun append(level: AppLogLevel, tag: String, message: String, nowMs: Long) = Unit
+}
+
 class AppLogger(
     private val sink: AppLogSink,
     private val minLevel: AppLogLevel,

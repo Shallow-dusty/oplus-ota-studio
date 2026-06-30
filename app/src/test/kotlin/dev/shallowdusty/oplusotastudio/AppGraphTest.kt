@@ -23,6 +23,9 @@ import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutionResult
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.SerialDownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
+import dev.shallowdusty.oplusotastudio.logging.AppLogger
+import dev.shallowdusty.oplusotastudio.logging.AppLogLevel
+import dev.shallowdusty.oplusotastudio.logging.AppLogSink
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -164,6 +167,17 @@ class AppGraphTest {
     }
 
     @Test
+    fun `uses supplied app logger`() {
+        val logger = AppLogger(
+            sink = NoOpAppLogSink(),
+            minLevel = AppLogLevel.Info,
+        )
+        val graph = AppGraph(appLogger = logger)
+
+        assertSame(logger, graph.appLogger)
+    }
+
+    @Test
     fun `creates download worker executor for real download engine`() {
         val graph = AppGraph(downloadTempRoot = File("build/tmp/app-graph-worker-executor-test"))
 
@@ -250,6 +264,10 @@ class AppGraphTest {
     private class NoOpDownloadWorkerExecutor : DownloadWorkerExecutor {
         override suspend fun execute(taskId: String): DownloadWorkerExecutionResult =
             DownloadWorkerExecutionResult.Failed
+    }
+
+    private class NoOpAppLogSink : AppLogSink {
+        override fun append(level: AppLogLevel, tag: String, message: String, nowMs: Long) = Unit
     }
 
     private fun testTempRoot(name: String): File {

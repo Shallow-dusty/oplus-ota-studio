@@ -25,6 +25,9 @@ import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.fake.FakePackageRepository
+import dev.shallowdusty.oplusotastudio.logging.AppLogLevel
+import dev.shallowdusty.oplusotastudio.logging.AppLogger
+import dev.shallowdusty.oplusotastudio.logging.NoOpAppLogSink
 import java.io.File
 import kotlinx.coroutines.flow.first
 
@@ -42,6 +45,10 @@ class AppGraph(
     val packageRepository: PackageRepository = FakePackageRepository(),
     val downloadPreferencesStore: DownloadPreferencesStore = FakeDownloadPreferencesStore(),
     val lookupPrivacyConsentStore: LookupPrivacyConsentStore = AlwaysAcceptedLookupPrivacyConsentStore,
+    val appLogger: AppLogger = AppLogger(
+        sink = NoOpAppLogSink,
+        minLevel = AppLogLevel.Info,
+    ),
     private val downloadTaskStore: DownloadTaskStore? = null,
     private val downloadFilePromoter: DownloadFilePromoter? = null,
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,

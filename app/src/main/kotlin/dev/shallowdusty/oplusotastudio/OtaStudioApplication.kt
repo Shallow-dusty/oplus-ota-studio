@@ -2,6 +2,7 @@ package dev.shallowdusty.oplusotastudio
 
 import android.app.Application
 import android.content.ComponentCallbacks2
+import android.content.pm.ApplicationInfo
 import android.os.Environment
 import androidx.work.WorkManager
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
@@ -18,6 +19,7 @@ import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutorProvider
 import dev.shallowdusty.oplusotastudio.download.WorkManagerDownloadWorkEnqueuer
+import dev.shallowdusty.oplusotastudio.logging.createAppLogger
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +43,10 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
             packageRepository = RoomPackageRepository(database.historyDao()),
             downloadPreferencesStore = downloadPreferencesStore,
             lookupPrivacyConsentStore = createLookupPrivacyConsentStore(this),
+            appLogger = createAppLogger(
+                filesDir = filesDir,
+                debuggable = isAppDebuggable(),
+            ),
             downloadTaskStore = RoomDownloadTaskStore(database.downloadTaskDao()),
             downloadFilePromoter = AndroidMediaStoreDownloadFilePromoter(this),
             storageSnapshotProvider = AndroidDownloadStorageSnapshotProvider(this, downloadTempRoot),
@@ -79,6 +85,9 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
             getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
             cacheDir,
         ).distinctBy { it.absolutePath }
+
+    private fun isAppDebuggable(): Boolean =
+        (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     private companion object {
         const val LowResourceDownloadRejectionReason =
