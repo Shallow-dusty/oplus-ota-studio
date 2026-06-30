@@ -220,6 +220,20 @@ class SimpleDownloadEngine(
             var response = executeRequest(rangeStart)
             if (rangeStart != null && response.code == 416) {
                 response.close()
+                updateState(
+                    DownloadState.Failed(
+                        category = OtaErrorCategory.Server,
+                        retriesRemaining = maxAttempts - 1,
+                        raw = "Server rejected resume range, restarting download from zero",
+                    ),
+                )
+                updateState(
+                    DownloadState.Retrying(
+                        attempt = 1,
+                        maxAttempts = maxAttempts,
+                        category = OtaErrorCategory.Server,
+                    ),
+                )
                 tempFile.delete()
                 rangeStart = null
                 response = executeRequest(rangeStart)
