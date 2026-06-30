@@ -54,6 +54,22 @@ class DownloadWorkerExecutorAdapterTest {
     }
 
     @Test
+    fun `returns retry when stored task fails with retriable attempts remaining`() = runTest {
+        val executor = DownloadWorkerExecutorAdapter {
+            DownloadState.Failed(
+                category = OtaErrorCategory.Network,
+                retriesRemaining = 1,
+                raw = "timeout",
+            )
+        }
+
+        assertEquals(
+            DownloadWorkerExecutionResult.Retry,
+            executor.execute("task-1"),
+        )
+    }
+
+    @Test
     fun `returns retry when stored task execution has network io exception`() = runTest {
         val executor = DownloadWorkerExecutorAdapter {
             throw IOException("socket closed")

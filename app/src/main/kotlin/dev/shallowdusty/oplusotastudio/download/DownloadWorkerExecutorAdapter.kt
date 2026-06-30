@@ -1,6 +1,7 @@
 package dev.shallowdusty.oplusotastudio.download
 
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
+import dev.shallowdusty.oplusotastudio.core.model.isRetriable
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 
@@ -25,6 +26,12 @@ object DownloadWorkerExecutionMapper {
         when (state) {
             DownloadState.Verified -> DownloadWorkerExecutionResult.Succeeded
             is DownloadState.Retrying -> DownloadWorkerExecutionResult.Retry
+            is DownloadState.Failed ->
+                if (state.category.isRetriable && state.retriesRemaining > 0) {
+                    DownloadWorkerExecutionResult.Retry
+                } else {
+                    DownloadWorkerExecutionResult.Failed
+                }
             else -> DownloadWorkerExecutionResult.Failed
         }
 }
