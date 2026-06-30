@@ -24,6 +24,7 @@ import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.SerialDownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
 import dev.shallowdusty.oplusotastudio.logging.AppLogger
+import dev.shallowdusty.oplusotastudio.logging.AppLogArchiveExporter
 import dev.shallowdusty.oplusotastudio.logging.AppLogLevel
 import dev.shallowdusty.oplusotastudio.logging.AppLogSink
 import dev.shallowdusty.oplusotastudio.logging.LoggingDownloadEngine
@@ -192,6 +193,18 @@ class AppGraphTest {
         val graph = AppGraph(appLogger = logger)
 
         assertSame(logger, graph.appLogger)
+    }
+
+    @Test
+    fun `uses supplied app log archive exporter`() {
+        val exporter = AppLogArchiveExporter(
+            logStore = dev.shallowdusty.oplusotastudio.logging.RollingFileLogStore(
+                logDir = File("build/tmp/app-graph-log-exporter-test"),
+            ),
+        )
+        val graph = AppGraph(appLogArchiveExporter = exporter)
+
+        assertSame(exporter, graph.appLogArchiveExporter)
     }
 
     @Test

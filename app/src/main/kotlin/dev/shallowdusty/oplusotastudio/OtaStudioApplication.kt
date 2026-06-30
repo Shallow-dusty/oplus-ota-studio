@@ -19,6 +19,7 @@ import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutorProvider
 import dev.shallowdusty.oplusotastudio.download.WorkManagerDownloadWorkEnqueuer
+import dev.shallowdusty.oplusotastudio.logging.createAppLogArchiveExporter
 import dev.shallowdusty.oplusotastudio.logging.createAppLogger
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +48,7 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
                 filesDir = filesDir,
                 debuggable = isAppDebuggable(),
             ),
+            appLogArchiveExporter = createAppLogArchiveExporter(filesDir = filesDir),
             downloadTaskStore = RoomDownloadTaskStore(database.downloadTaskDao()),
             downloadFilePromoter = AndroidMediaStoreDownloadFilePromoter(this),
             storageSnapshotProvider = AndroidDownloadStorageSnapshotProvider(this, downloadTempRoot),

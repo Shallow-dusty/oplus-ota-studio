@@ -25,6 +25,7 @@ import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadEngine
 import dev.shallowdusty.oplusotastudio.fake.FakeDownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.fake.FakePackageRepository
+import dev.shallowdusty.oplusotastudio.logging.AppLogArchiveExporter
 import dev.shallowdusty.oplusotastudio.logging.AppLogLevel
 import dev.shallowdusty.oplusotastudio.logging.AppLogger
 import dev.shallowdusty.oplusotastudio.logging.LoggingDownloadEngine
@@ -51,6 +52,7 @@ class AppGraph(
         sink = NoOpAppLogSink,
         minLevel = AppLogLevel.Info,
     ),
+    val appLogArchiveExporter: AppLogArchiveExporter? = null,
     private val downloadTaskStore: DownloadTaskStore? = null,
     private val downloadFilePromoter: DownloadFilePromoter? = null,
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
