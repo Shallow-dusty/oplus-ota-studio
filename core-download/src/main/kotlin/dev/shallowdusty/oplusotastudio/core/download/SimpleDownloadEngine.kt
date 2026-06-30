@@ -25,6 +25,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -103,9 +104,15 @@ class SimpleDownloadEngine(
     ) : DownloadTask {
         private val _state = MutableStateFlow<DownloadState>(DownloadState.Queued)
         override val state: Flow<DownloadState> = _state.asStateFlow()
+        @Volatile
         private var job: Job? = null
+        @Volatile
+        private var currentCall: Call? = null
+        @Volatile
+        private var pauseRequested = false
 
         fun start() {
+            pauseRequested = false
             job = scope.launch {
                 runToTerminal()
             }
@@ -121,17 +128,26 @@ class SimpleDownloadEngine(
         }
 
         override suspend fun pause() {
+            if (_state.value !is DownloadState.Running) return
+            pauseRequested = true
             updateState(DownloadState.Paused(DownloadState.Paused.PauseReason.User))
+            currentCall?.cancel()
+            job?.cancel()
         }
 
         override suspend fun resume() {
             if (_state.value is DownloadState.Paused) {
-                updateState(DownloadState.Running(tempFile.length(), pkg.sizeBytes, null))
+                updateState(DownloadState.Queued)
+                queueMutex.withLock {
+                    queuedTasks.addLast(this)
+                    startNextTaskIfIdle()
+                }
             }
         }
 
         override suspend fun cancel() {
             removeQueuedTask(this)
+            currentCall?.cancel()
             job?.cancel()
             updateState(DownloadState.Canceled)
             tempFile.delete()
@@ -155,6 +171,9 @@ class SimpleDownloadEngine(
                 val outcome = try {
                     runDownloadAttempt()
                 } catch (error: IOException) {
+                    if (isUserStopped()) {
+                        return
+                    }
                     DownloadAttemptOutcome.Failed(
                         category = OtaErrorCategory.Network,
                         raw = error.message,
@@ -178,12 +197,12 @@ class SimpleDownloadEngine(
             }
             resumePlan?.truncateToBytes?.let { tempFile.truncateTo(it) }
             var rangeStart = resumePlan?.rangeStart?.takeIf { it > 0L }
-            var response = client.newCall(buildRequest(rangeStart)).execute()
+            var response = executeRequest(rangeStart)
             if (rangeStart != null && response.code == 416) {
                 response.close()
                 tempFile.delete()
                 rangeStart = null
-                response = client.newCall(buildRequest(rangeStart)).execute()
+                response = executeRequest(rangeStart)
             }
             if (
                 rangeStart != null &&
@@ -193,7 +212,7 @@ class SimpleDownloadEngine(
                 response.close()
                 tempFile.delete()
                 rangeStart = null
-                response = client.newCall(buildRequest(rangeStart)).execute()
+                response = executeRequest(rangeStart)
             }
             response.use {
                 if (!response.isSuccessful) {
@@ -230,11 +249,13 @@ class SimpleDownloadEngine(
                             output.write(buffer, 0, read)
                             downloaded += read
                             updateState(DownloadState.Running(downloaded, targetSize, null))
+                            if (isUserStopped()) return DownloadAttemptOutcome.Finished
                         }
                     }
                 }
             }
 
+            if (isUserStopped()) return DownloadAttemptOutcome.Finished
             updateState(DownloadState.Verifying)
             when (
                 val result = checksumVerifier.verify(
@@ -265,6 +286,15 @@ class SimpleDownloadEngine(
             }
             return DownloadAttemptOutcome.Finished
         }
+
+        private fun executeRequest(rangeStart: Long?): Response {
+            val call = client.newCall(buildRequest(rangeStart))
+            currentCall = call
+            return call.execute()
+        }
+
+        private fun isUserStopped(): Boolean =
+            pauseRequested || _state.value is DownloadState.Paused || _state.value == DownloadState.Canceled
 
         private suspend fun retryOrFinish(
             outcome: DownloadAttemptOutcome.Failed,

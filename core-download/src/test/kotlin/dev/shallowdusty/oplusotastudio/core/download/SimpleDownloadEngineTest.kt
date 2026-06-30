@@ -1,6 +1,7 @@
 package dev.shallowdusty.oplusotastudio.core.download
 
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
+import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
@@ -467,6 +468,134 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `pause stops active download without verifying partial file`() = runTest {
+        val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val body = "abcdef"
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .body(body)
+                    .bodyDelay(1, TimeUnit.SECONDS)
+                    .build(),
+            )
+            server.start()
+            val tempRoot = testTempRoot("pause-active")
+            val store = RecordingDownloadTaskStore()
+            val engine = SimpleDownloadEngine(
+                client = OkHttpClient(),
+                tempRoot = tempRoot,
+                scope = engineScope,
+                taskStore = store,
+            )
+            val task = engine.enqueue(
+                samplePackage(
+                    url = server.url("/pkg.zip").toString(),
+                    md5 = "e80b5017098950fc58aad83c8c14978e",
+                ),
+            )
+
+            task.state.first { it is DownloadState.Running }
+            task.pause()
+
+            assertEquals(
+                DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+                task.state.first(),
+            )
+            Thread.sleep(500)
+            assertEquals(
+                DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+                task.state.first(),
+            )
+            assertTrue(store.updates.none { it.state == DownloadState.Verifying })
+            assertTrue(store.updates.none { it.state == DownloadState.Verified })
+            assertTrue(tempRoot.resolve("${task.taskId}.zip.part").length() < body.length)
+        } finally {
+            engineScope.cancel()
+        }
+    }
+
+    @Test
+    fun `resume restarts paused active download`() = runTest {
+        val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .body("interrupted")
+                    .bodyDelay(1, TimeUnit.SECONDS)
+                    .build(),
+            )
+            server.enqueue(MockResponse(code = 200, body = "abc"))
+            server.start()
+            val store = RecordingDownloadTaskStore()
+            val engine = SimpleDownloadEngine(
+                client = OkHttpClient(),
+                tempRoot = testTempRoot("resume-paused-active"),
+                scope = engineScope,
+                taskStore = store,
+            )
+            val task = engine.enqueue(
+                samplePackage(
+                    url = server.url("/pkg.zip").toString(),
+                    md5 = "900150983cd24fb0d6963f7d28e17f72",
+                ),
+            )
+
+            task.state.first { it is DownloadState.Running }
+            task.pause()
+            task.resume()
+
+            waitUntilVerified(task)
+
+            assertEquals(2, server.requestCount)
+            assertTrue(store.updates.any { it.state == DownloadState.Queued })
+            assertEquals(DownloadState.Verified, store.updates.last().state)
+        } finally {
+            engineScope.cancel()
+        }
+    }
+
+    @Test
+    fun `queued task ignores pause until it starts`() = runTest {
+        val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .body("abc")
+                    .bodyDelay(1, TimeUnit.SECONDS)
+                    .build(),
+            )
+            server.enqueue(MockResponse(code = 200, body = "abc"))
+            server.start()
+            val engine = SimpleDownloadEngine(
+                client = OkHttpClient(),
+                tempRoot = testTempRoot("pause-queued"),
+                scope = engineScope,
+            )
+            engine.enqueue(
+                samplePackage(
+                    url = server.url("/first.zip").toString(),
+                    md5 = "900150983cd24fb0d6963f7d28e17f72",
+                ),
+            )
+            val second = engine.enqueue(
+                samplePackage(
+                    url = server.url("/second.zip").toString(),
+                    md5 = "900150983cd24fb0d6963f7d28e17f72",
+                ),
+            )
+
+            second.pause()
+
+            assertEquals(DownloadState.Queued, second.state.first())
+        } finally {
+            engineScope.cancel()
+        }
+    }
+
+    @Test
     fun `resumes existing partial file with range request`() = runTest {
         server.enqueue(
             MockResponse(
@@ -709,6 +838,15 @@ class SimpleDownloadEngineTest {
         dir.deleteRecursively()
         dir.mkdirs()
         return dir
+    }
+
+    private suspend fun waitUntilVerified(task: DownloadTask) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (System.nanoTime() < deadline) {
+            if (task.state.first() == DownloadState.Verified) return
+            Thread.sleep(25)
+        }
+        assertEquals(DownloadState.Verified, task.state.first())
     }
 
     private data class CreatedTask(
