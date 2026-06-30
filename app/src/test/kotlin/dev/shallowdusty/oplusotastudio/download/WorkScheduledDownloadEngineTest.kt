@@ -153,6 +153,34 @@ class WorkScheduledDownloadEngineTest {
         )
     }
 
+    @Test
+    fun `terminal verified task ignores pause resume and cancel controls`() = runTest {
+        val store = RecordingDownloadTaskStore(
+            initialTasks = listOf(
+                storedTask(
+                    taskId = "task-1",
+                    state = DownloadState.Verified,
+                ),
+            ),
+        )
+        val scheduler = RecordingDownloadWorkScheduler()
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/terminal-controls"),
+        )
+        val task = engine.observeAll().first().single()
+
+        task.pause()
+        task.resume()
+        task.cancel()
+
+        assertEquals(DownloadState.Verified, task.state.first())
+        assertTrue(scheduler.canceled.isEmpty())
+        assertTrue(scheduler.scheduled.isEmpty())
+        assertTrue(store.deleted.isEmpty())
+    }
+
     private fun samplePackage(): OtaPackage =
         OtaPackage(
             versionName = "test",

@@ -50,6 +50,7 @@ class WorkScheduledDownloadEngine(
                 }
 
             override suspend fun pause() {
+                if (currentState()?.isTerminal == true) return
                 scheduler.cancel(taskId)
                 taskStore.updateState(
                     taskId = taskId,
@@ -59,6 +60,7 @@ class WorkScheduledDownloadEngine(
             }
 
             override suspend fun resume() {
+                if (currentState()?.isTerminal == true) return
                 taskStore.updateState(
                     taskId = taskId,
                     state = DownloadState.Queued,
@@ -68,9 +70,22 @@ class WorkScheduledDownloadEngine(
             }
 
             override suspend fun cancel() {
+                if (currentState()?.isTerminal == true) return
                 scheduler.cancel(taskId)
                 tempFile.delete()
                 taskStore.deleteTask(taskId)
             }
+
+            private suspend fun currentState(): DownloadState? =
+                taskStore.getTask(taskId)?.state
         }
 }
+
+private val DownloadState.isTerminal: Boolean
+    get() =
+        when (this) {
+            DownloadState.Verified,
+            DownloadState.Canceled -> true
+            is DownloadState.Failed -> retriesRemaining <= 0
+            else -> false
+        }
