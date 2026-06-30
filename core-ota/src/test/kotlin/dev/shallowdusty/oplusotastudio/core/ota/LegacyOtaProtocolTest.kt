@@ -32,38 +32,25 @@ class LegacyOtaProtocolTest {
 
     @Test
     fun `parses legacy package found response`() {
-        val xml = """
-            <root>
-              <Command>NEW_VERSION</Command>
-              <versionName>LE2120_14.0.0.1901(CN01)</versionName>
-              <type>full</type>
-              <size>6559817109</size>
-              <md5>5ae1e4d8101218d58c1da10092b22996</md5>
-              <url>https://gauss-compotacostauto-cn.allawnfs.com/package.zip</url>
-            </root>
-        """.trimIndent()
+        val xml = fixture("synthetic-legacy-oneplus9pro-cn-success.xml")
 
         val result = LegacyOtaProtocol().parseResponse(
             rawXml = xml,
-            sourceHost = "gauss-compotacostauto-cn.allawnfs.com",
+            sourceHost = "example.invalid",
         )
 
         val pkg = assertInstanceOf(OtaLookupResult.PackageFound::class.java, result).pkg
         assertEquals("LE2120_14.0.0.1901(CN01)", pkg.versionName)
         assertEquals("full", pkg.type)
         assertEquals(6_559_817_109L, pkg.sizeBytes)
-        assertEquals("gauss-compotacostauto-cn.allawnfs.com", pkg.sourceHost)
-        assertEquals("https://gauss-compotacostauto-cn.allawnfs.com/package.zip", pkg.downloadUrl)
+        assertEquals("example.invalid", pkg.sourceHost)
+        assertEquals("https://example.invalid/oneplus9pro-cn-full.zip", pkg.downloadUrl)
         assertEquals("5ae1e4d8101218d58c1da10092b22996", pkg.md5)
     }
 
     @Test
     fun `parses legacy no update response`() {
-        val xml = """
-            <root>
-              <Command>NO_NEW_VERSION</Command>
-            </root>
-        """.trimIndent()
+        val xml = fixture("synthetic-legacy-oneplus9pro-cn-noupdate.xml")
 
         val result = LegacyOtaProtocol().parseResponse(
             rawXml = xml,
@@ -76,7 +63,7 @@ class LegacyOtaProtocolTest {
     @Test
     fun `maps malformed legacy response to malformed error`() {
         val result = LegacyOtaProtocol().parseResponse(
-            rawXml = "<root><Command>NEW_VERSION</Command></root>",
+            rawXml = fixture("synthetic-legacy-oneplus9pro-cn-missing-url.xml"),
             sourceHost = "otagm.oppo.com",
         )
 
@@ -86,19 +73,7 @@ class LegacyOtaProtocolTest {
 
     @Test
     fun `rejects legacy response with doctype declarations`() {
-        val xml = """
-            <!DOCTYPE root [
-              <!ENTITY external SYSTEM "file:///etc/passwd">
-            ]>
-            <root>
-              <Command>NEW_VERSION</Command>
-              <versionName>LE2120_14.0.0.1901(CN01)</versionName>
-              <type>full</type>
-              <size>6559817109</size>
-              <md5>5ae1e4d8101218d58c1da10092b22996</md5>
-              <url>https://gauss-compotacostauto-cn.allawnfs.com/package.zip</url>
-            </root>
-        """.trimIndent()
+        val xml = fixture("synthetic-legacy-oneplus9pro-cn-doctype.xml")
 
         val result = LegacyOtaProtocol().parseResponse(
             rawXml = xml,
@@ -108,4 +83,9 @@ class LegacyOtaProtocolTest {
         val error = assertInstanceOf(OtaLookupResult.Error::class.java, result)
         assertEquals(dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Malformed, error.category)
     }
+
+    private fun fixture(name: String): String =
+        requireNotNull(javaClass.getResource("/fixtures/$name")) {
+            "Missing OTA fixture: $name"
+        }.readText()
 }
