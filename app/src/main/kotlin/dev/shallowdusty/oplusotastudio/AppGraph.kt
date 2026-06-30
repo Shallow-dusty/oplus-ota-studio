@@ -10,6 +10,8 @@ import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
+import dev.shallowdusty.oplusotastudio.core.model.AlwaysAcceptedLookupPrivacyConsentStore
+import dev.shallowdusty.oplusotastudio.core.model.LookupPrivacyConsentStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
@@ -39,6 +41,7 @@ class AppGraph(
     private val downloadTempRoot: File? = null,
     val packageRepository: PackageRepository = FakePackageRepository(),
     val downloadPreferencesStore: DownloadPreferencesStore = FakeDownloadPreferencesStore(),
+    val lookupPrivacyConsentStore: LookupPrivacyConsentStore = AlwaysAcceptedLookupPrivacyConsentStore,
     private val downloadTaskStore: DownloadTaskStore? = null,
     private val downloadFilePromoter: DownloadFilePromoter? = null,
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,

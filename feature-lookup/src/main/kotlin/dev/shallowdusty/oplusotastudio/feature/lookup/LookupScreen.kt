@@ -59,6 +59,11 @@ fun LookupScreen(
             when (val s = state) {
                 LookupUiState.Detecting -> DetectingContent()
                 is LookupUiState.Ready -> ReadyContent(s, viewModel::lookup, viewModel::updateProfile)
+                is LookupUiState.PrivacyDisclosureRequired -> PrivacyDisclosureContent(
+                    state = s,
+                    onContinue = viewModel::acceptPrivacyDisclosureAndLookup,
+                    onBack = viewModel::reset,
+                )
                 LookupUiState.Querying -> QueryingContent()
                 is LookupUiState.PackageFound -> PackageFoundContent(
                     pkg = s.pkg,
@@ -68,6 +73,38 @@ fun LookupScreen(
                 LookupUiState.NoUpdate -> NoUpdateContent(viewModel::reset)
                 is LookupUiState.Error -> ErrorContent(s, viewModel::reset)
             }
+        }
+    }
+}
+
+@Composable
+private fun PrivacyDisclosureContent(
+    state: LookupUiState.PrivacyDisclosureRequired,
+    onContinue: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Before lookup", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "This app queries OPlus servers with your device build info. The request includes the model, region, and OTA version shown below.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        SummaryRow("Model", state.profile.model)
+        SummaryRow("Region", state.profile.region.name)
+        SummaryRow("OTA version", state.profile.otaVersion)
+        Text(
+            "Serial and IMEI are not sent.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth()) {
+            Text("Continue lookup")
+        }
+        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+            Text("Back")
         }
     }
 }

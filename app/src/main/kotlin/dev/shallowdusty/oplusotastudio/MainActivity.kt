@@ -106,6 +106,7 @@ private fun OtaStudioApp() {
                             lookupService = graph.otaLookupService,
                             downloadEngine = graph.downloadEngine,
                             packageRepository = graph.packageRepository,
+                            privacyConsentStore = graph.lookupPrivacyConsentStore,
                         )
                     },
                 )

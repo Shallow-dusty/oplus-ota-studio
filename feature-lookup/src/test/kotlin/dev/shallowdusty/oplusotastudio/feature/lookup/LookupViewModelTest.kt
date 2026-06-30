@@ -12,9 +12,11 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
+import dev.shallowdusty.oplusotastudio.core.model.LookupPrivacyConsentStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -97,6 +99,66 @@ class LookupViewModelTest {
             ),
             repository.recorded,
         )
+    }
+
+    @Test
+    fun `lookup requires privacy disclosure before first request`() = runTest {
+        val service = FakeLookupService(OtaLookupResult.PackageFound(samplePackage()))
+        val consentStore = FakeLookupPrivacyConsentStore(accepted = false)
+        val vm = LookupViewModel(
+            deviceDetector = FakeDeviceDetector(completeProfile()),
+            lookupService = service,
+            privacyConsentStore = consentStore,
+        )
+        advanceUntilIdle()
+
+        vm.lookup()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertTrue(state is LookupUiState.PrivacyDisclosureRequired)
+        assertEquals(0, service.calls)
+        assertEquals(false, consentStore.accepted.value)
+    }
+
+    @Test
+    fun `accepting privacy disclosure persists consent and runs pending lookup`() = runTest {
+        val pkg = samplePackage()
+        val service = FakeLookupService(OtaLookupResult.PackageFound(pkg))
+        val consentStore = FakeLookupPrivacyConsentStore(accepted = false)
+        val vm = LookupViewModel(
+            deviceDetector = FakeDeviceDetector(completeProfile()),
+            lookupService = service,
+            privacyConsentStore = consentStore,
+        )
+        advanceUntilIdle()
+        vm.lookup()
+        advanceUntilIdle()
+
+        vm.acceptPrivacyDisclosureAndLookup()
+        advanceUntilIdle()
+
+        assertEquals(true, consentStore.accepted.value)
+        assertEquals(1, service.calls)
+        assertEquals(LookupUiState.PackageFound(pkg), vm.uiState.value)
+    }
+
+    @Test
+    fun `accepted privacy disclosure allows lookup immediately`() = runTest {
+        val pkg = samplePackage()
+        val service = FakeLookupService(OtaLookupResult.PackageFound(pkg))
+        val vm = LookupViewModel(
+            deviceDetector = FakeDeviceDetector(completeProfile()),
+            lookupService = service,
+            privacyConsentStore = FakeLookupPrivacyConsentStore(accepted = true),
+        )
+        advanceUntilIdle()
+
+        vm.lookup()
+        advanceUntilIdle()
+
+        assertEquals(1, service.calls)
+        assertEquals(LookupUiState.PackageFound(pkg), vm.uiState.value)
     }
 
     @Test
@@ -301,5 +363,15 @@ class LookupViewModelTest {
         ) = Unit
 
         override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(recorded)
+    }
+
+    private class FakeLookupPrivacyConsentStore(
+        accepted: Boolean,
+    ) : LookupPrivacyConsentStore {
+        override val accepted = MutableStateFlow(accepted)
+
+        override suspend fun accept() {
+            this.accepted.value = true
+        }
     }
 }
