@@ -42,6 +42,7 @@ class DownloadsViewModel(
     val uiState: StateFlow<DownloadsUiState> = _uiState.asStateFlow()
 
     private val latest = mutableMapOf<String, DownloadState>()
+    private val taskHandles = mutableMapOf<String, DownloadTask>()
     private val stateJobs = mutableMapOf<String, Job>()
 
     init {
@@ -55,11 +56,13 @@ class DownloadsViewModel(
                 val removedTaskIds = latest.keys - observedTaskIds
                 removedTaskIds.forEach { taskId ->
                     latest.remove(taskId)
+                    taskHandles.remove(taskId)
                     stateJobs.remove(taskId)?.cancel()
                 }
 
                 // Subscribe to any new task's state flow.
                 tasks.forEach { task ->
+                    taskHandles[task.taskId] = task
                     if (task.taskId !in stateJobs) {
                         latest[task.taskId] = DownloadState.Queued
                         stateJobs[task.taskId] = viewModelScope.launch {
@@ -81,15 +84,18 @@ class DownloadsViewModel(
         )
     }
 
-    fun pause(taskId: String, task: DownloadTask) {
+    fun pause(taskId: String) {
+        val task = taskHandles[taskId] ?: return
         viewModelScope.launch { task.pause() }
     }
 
-    fun resume(taskId: String, task: DownloadTask) {
+    fun resume(taskId: String) {
+        val task = taskHandles[taskId] ?: return
         viewModelScope.launch { task.resume() }
     }
 
-    fun cancel(taskId: String, task: DownloadTask) {
+    fun cancel(taskId: String) {
+        val task = taskHandles[taskId] ?: return
         viewModelScope.launch { task.cancel() }
     }
 }

@@ -62,7 +62,12 @@ fun DownloadsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(state.rows, key = { it.taskId }) { row ->
-                    DownloadRowCard(row)
+                    DownloadRowCard(
+                        row = row,
+                        onPause = viewModel::pause,
+                        onResume = viewModel::resume,
+                        onCancel = viewModel::cancel,
+                    )
                 }
             }
         }
@@ -70,7 +75,12 @@ fun DownloadsScreen(
 }
 
 @Composable
-private fun DownloadRowCard(row: DownloadRow) {
+private fun DownloadRowCard(
+    row: DownloadRow,
+    onPause: (String) -> Unit,
+    onResume: (String) -> Unit,
+    onCancel: (String) -> Unit,
+) {
     Column(Modifier.fillMaxWidth()) {
         Text(
             text = row.taskId.takeLast(8),
@@ -80,8 +90,18 @@ private fun DownloadRowCard(row: DownloadRow) {
         Spacer(Modifier.height(4.dp))
         when (val s = row.state) {
             DownloadState.Queued -> StateLabel("Queued")
-            is DownloadState.Running -> RunningContent(s)
-            is DownloadState.Paused -> PausedContent(s)
+            is DownloadState.Running -> RunningContent(
+                state = s,
+                taskId = row.taskId,
+                onPause = onPause,
+                onCancel = onCancel,
+            )
+            is DownloadState.Paused -> PausedContent(
+                state = s,
+                taskId = row.taskId,
+                onResume = onResume,
+                onCancel = onCancel,
+            )
             is DownloadState.Retrying -> RetryingContent(s)
             DownloadState.Verifying -> VerifyingContent()
             DownloadState.Verified -> StateLabel("Verified", color = MaterialTheme.colorScheme.primary)
@@ -98,7 +118,12 @@ private fun StateLabel(text: String, color: androidx.compose.ui.graphics.Color =
 }
 
 @Composable
-private fun RunningContent(state: DownloadState.Running) {
+private fun RunningContent(
+    state: DownloadState.Running,
+    taskId: String,
+    onPause: (String) -> Unit,
+    onCancel: (String) -> Unit,
+) {
     val target = state.targetSize
     val progress = if (target != null && target > 0) {
         (state.downloadedBytes.toFloat() / target).coerceIn(0f, 1f)
@@ -114,17 +139,22 @@ private fun RunningContent(state: DownloadState.Running) {
         Text(state.speedBytesPerSec?.let { "${formatBytes(it)}/s" } ?: "—", style = MaterialTheme.typography.bodySmall)
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { /* pause: wired via ViewModel in app */ }, modifier = Modifier.weight(1f)) { Text("Pause") }
-        TextButton(onClick = { /* cancel */ }, modifier = Modifier.weight(1f)) { Text("Cancel") }
+        OutlinedButton(onClick = { onPause(taskId) }, modifier = Modifier.weight(1f)) { Text("Pause") }
+        TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.weight(1f)) { Text("Cancel") }
     }
 }
 
 @Composable
-private fun PausedContent(state: DownloadState.Paused) {
+private fun PausedContent(
+    state: DownloadState.Paused,
+    taskId: String,
+    onResume: (String) -> Unit,
+    onCancel: (String) -> Unit,
+) {
     StateLabel("Paused (${state.reason.name.lowercase()})", color = MaterialTheme.colorScheme.tertiary)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { /* resume */ }, modifier = Modifier.weight(1f)) { Text("Resume") }
-        TextButton(onClick = { /* cancel */ }, modifier = Modifier.weight(1f)) { Text("Cancel") }
+        OutlinedButton(onClick = { onResume(taskId) }, modifier = Modifier.weight(1f)) { Text("Resume") }
+        TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.weight(1f)) { Text("Cancel") }
     }
 }
 

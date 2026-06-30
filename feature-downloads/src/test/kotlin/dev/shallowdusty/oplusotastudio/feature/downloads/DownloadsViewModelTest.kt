@@ -140,6 +140,54 @@ class DownloadsViewModelTest {
         assertTrue(vm.uiState.value.rows.isEmpty())
     }
 
+    @Test
+    fun `pause by task id forwards to matching task`() = runTest {
+        val engine = FakeDownloadEngine()
+        val task = engine.enqueueNow(samplePackage()) as FakeDownloadTask
+        val vm = DownloadsViewModel(engine)
+        advanceUntilIdle()
+
+        vm.pause(task.taskId)
+        advanceUntilIdle()
+
+        assertEquals(1, task.pauseCalls)
+        assertEquals(0, task.resumeCalls)
+        assertEquals(0, task.cancelCalls)
+    }
+
+    @Test
+    fun `resume and cancel by task id forward to matching task`() = runTest {
+        val engine = FakeDownloadEngine()
+        val task = engine.enqueueNow(samplePackage()) as FakeDownloadTask
+        val vm = DownloadsViewModel(engine)
+        advanceUntilIdle()
+
+        vm.resume(task.taskId)
+        vm.cancel(task.taskId)
+        advanceUntilIdle()
+
+        assertEquals(0, task.pauseCalls)
+        assertEquals(1, task.resumeCalls)
+        assertEquals(1, task.cancelCalls)
+    }
+
+    @Test
+    fun `download action with unknown task id is ignored`() = runTest {
+        val engine = FakeDownloadEngine()
+        val task = engine.enqueueNow(samplePackage()) as FakeDownloadTask
+        val vm = DownloadsViewModel(engine)
+        advanceUntilIdle()
+
+        vm.pause("missing")
+        vm.resume("missing")
+        vm.cancel("missing")
+        advanceUntilIdle()
+
+        assertEquals(0, task.pauseCalls)
+        assertEquals(0, task.resumeCalls)
+        assertEquals(0, task.cancelCalls)
+    }
+
     private fun samplePackage() = OtaPackage(
         versionName = "12.0.0.0.LE28AA",
         type = "full",
@@ -175,9 +223,24 @@ class DownloadsViewModelTest {
         override val taskId: String = "fake-${System.nanoTime()}"
         private val _state = MutableSharedFlow<DownloadState>(replay = 1)
         override val state: Flow<DownloadState> = _state.asSharedFlow()
-        override suspend fun pause() {}
-        override suspend fun resume() {}
-        override suspend fun cancel() {}
+        var pauseCalls: Int = 0
+            private set
+        var resumeCalls: Int = 0
+            private set
+        var cancelCalls: Int = 0
+            private set
+
+        override suspend fun pause() {
+            pauseCalls += 1
+        }
+
+        override suspend fun resume() {
+            resumeCalls += 1
+        }
+
+        override suspend fun cancel() {
+            cancelCalls += 1
+        }
 
         suspend fun emit(state: DownloadState) {
             _state.emit(state)
