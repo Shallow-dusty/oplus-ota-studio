@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,6 +42,7 @@ class DownloadsViewModel(
     val uiState: StateFlow<DownloadsUiState> = _uiState.asStateFlow()
 
     private val latest = mutableMapOf<String, DownloadState>()
+    private val stateJobs = mutableMapOf<String, Job>()
 
     init {
         observeQueue()
@@ -49,11 +51,18 @@ class DownloadsViewModel(
     private fun observeQueue() {
         viewModelScope.launch {
             engine.observeAll().collect { tasks ->
+                val observedTaskIds = tasks.mapTo(mutableSetOf()) { it.taskId }
+                val removedTaskIds = latest.keys - observedTaskIds
+                removedTaskIds.forEach { taskId ->
+                    latest.remove(taskId)
+                    stateJobs.remove(taskId)?.cancel()
+                }
+
                 // Subscribe to any new task's state flow.
                 tasks.forEach { task ->
-                    if (task.taskId !in latest) {
+                    if (task.taskId !in stateJobs) {
                         latest[task.taskId] = DownloadState.Queued
-                        viewModelScope.launch {
+                        stateJobs[task.taskId] = viewModelScope.launch {
                             task.state.collect { state ->
                                 latest[task.taskId] = state
                                 emitRows()

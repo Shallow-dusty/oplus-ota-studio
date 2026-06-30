@@ -7,10 +7,9 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -113,6 +112,21 @@ class DownloadsViewModelTest {
         assertEquals(2, vm.uiState.value.rows.size)
     }
 
+    @Test
+    fun `removed task disappears from rows and stops updating`() = runTest {
+        val engine = FakeDownloadEngine()
+        val task = engine.enqueueNow(samplePackage()) as FakeDownloadTask
+        val vm = DownloadsViewModel(engine)
+        advanceUntilIdle()
+
+        engine.remove(task)
+        advanceUntilIdle()
+        task.emit(DownloadState.Running(100L, 1000L, null))
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.rows.isEmpty())
+    }
+
     private fun samplePackage() = OtaPackage(
         versionName = "12.0.0.0.LE28AA",
         type = "full",
@@ -125,15 +139,23 @@ class DownloadsViewModelTest {
 
     private class FakeDownloadEngine : DownloadEngine {
         private val tasks = mutableListOf<FakeDownloadTask>()
+        private val observedTasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+
         override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
             val task = FakeDownloadTask()
             tasks.add(task)
+            observedTasks.value = tasks.toList()
             return task
         }
 
         fun enqueueNow(pkg: OtaPackage): DownloadTask = kotlinx.coroutines.runBlocking { enqueue(pkg) }
 
-        override fun observeAll(): Flow<List<DownloadTask>> = flow { emit(tasks.toList()) }
+        fun remove(task: FakeDownloadTask) {
+            tasks.remove(task)
+            observedTasks.value = tasks.toList()
+        }
+
+        override fun observeAll(): Flow<List<DownloadTask>> = observedTasks.asStateFlow()
     }
 
     private class FakeDownloadTask : DownloadTask {
