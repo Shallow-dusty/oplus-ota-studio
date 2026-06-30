@@ -83,9 +83,10 @@ class WorkScheduledDownloadEngineTest {
                 ),
             ),
         )
+        val scheduler = RecordingDownloadWorkScheduler()
         val engine = WorkScheduledDownloadEngine(
             taskStore = store,
-            scheduler = RecordingDownloadWorkScheduler(),
+            scheduler = scheduler,
             tempRoot = tempRoot,
         )
         val task = engine.observeAll().first().single()
@@ -93,6 +94,7 @@ class WorkScheduledDownloadEngineTest {
         task.cancel()
 
         assertTrue(store.deleted.contains("task-1"))
+        assertEquals(listOf("task-1"), scheduler.canceled)
         assertTrue(!partFile.exists())
     }
 
@@ -149,9 +151,14 @@ class WorkScheduledDownloadEngineTest {
 
     private class RecordingDownloadWorkScheduler : DownloadTaskWorkScheduler {
         val scheduled = mutableListOf<String>()
+        val canceled = mutableListOf<String>()
 
         override suspend fun schedule(taskId: String) {
             scheduled += taskId
+        }
+
+        override fun cancel(taskId: String) {
+            canceled += taskId
         }
     }
 

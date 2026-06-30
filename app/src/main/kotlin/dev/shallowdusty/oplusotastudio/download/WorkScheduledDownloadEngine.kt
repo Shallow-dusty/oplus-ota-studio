@@ -67,6 +67,7 @@ class WorkScheduledDownloadEngine(
             }
 
             override suspend fun cancel() {
+                scheduler.cancel(taskId)
                 tempFile.delete()
                 taskStore.deleteTask(taskId)
             }

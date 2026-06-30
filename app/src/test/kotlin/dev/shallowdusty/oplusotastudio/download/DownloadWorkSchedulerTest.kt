@@ -25,18 +25,42 @@ class DownloadWorkSchedulerTest {
 
         scheduler.schedule(taskId = "task-1")
 
-        val request = enqueuer.requests.single()
+        val request = enqueuer.enqueued.single().request
+        assertEquals("task-1", enqueuer.enqueued.single().taskId)
         assertEquals("task-1", request.workSpec.input.getString(DownloadWorker.TaskIdKey))
         assertEquals(NetworkType.CONNECTED, request.workSpec.constraints.requiredNetworkType)
     }
 
-    private class RecordingDownloadWorkEnqueuer : DownloadWorkEnqueuer {
-        val requests = mutableListOf<OneTimeWorkRequest>()
+    @Test
+    fun `cancels work by task id`() {
+        val enqueuer = RecordingDownloadWorkEnqueuer()
+        val scheduler = DownloadWorkScheduler(
+            preferencesStore = RecordingDownloadPreferencesStore(DownloadPreferences()),
+            enqueuer = enqueuer,
+        )
 
-        override fun enqueue(request: OneTimeWorkRequest) {
-            requests += request
+        scheduler.cancel(taskId = "task-1")
+
+        assertEquals(listOf("task-1"), enqueuer.canceled)
+    }
+
+    private class RecordingDownloadWorkEnqueuer : DownloadWorkEnqueuer {
+        val enqueued = mutableListOf<EnqueuedRequest>()
+        val canceled = mutableListOf<String>()
+
+        override fun enqueue(taskId: String, request: OneTimeWorkRequest) {
+            enqueued += EnqueuedRequest(taskId, request)
+        }
+
+        override fun cancel(taskId: String) {
+            canceled += taskId
         }
     }
+
+    private data class EnqueuedRequest(
+        val taskId: String,
+        val request: OneTimeWorkRequest,
+    )
 
     private class RecordingDownloadPreferencesStore(
         initialPreferences: DownloadPreferences,

@@ -222,11 +222,15 @@ class AppGraphTest {
     }
 
     private class NoOpDownloadWorkEnqueuer : DownloadWorkEnqueuer {
-        override fun enqueue(request: OneTimeWorkRequest) = Unit
+        override fun enqueue(taskId: String, request: OneTimeWorkRequest) = Unit
+
+        override fun cancel(taskId: String) = Unit
     }
 
     private class NoOpDownloadTaskWorkScheduler : DownloadTaskWorkScheduler {
         override suspend fun schedule(taskId: String) = Unit
+
+        override fun cancel(taskId: String) = Unit
     }
 
     private class NoOpDownloadWorkerExecutor : DownloadWorkerExecutor {

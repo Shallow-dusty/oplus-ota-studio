@@ -1,6 +1,7 @@
 package dev.shallowdusty.oplusotastudio.download
 
 import androidx.work.OneTimeWorkRequest
+import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
 import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferencesStore
 import kotlinx.coroutines.flow.first
@@ -13,22 +14,40 @@ class DownloadWorkScheduler(
 
     override suspend fun schedule(taskId: String) {
         val preferences = preferencesStore.preferences.first()
-        enqueuer.enqueue(requestFactory.create(taskId, preferences))
+        enqueuer.enqueue(taskId, requestFactory.create(taskId, preferences))
+    }
+
+    override fun cancel(taskId: String) {
+        enqueuer.cancel(taskId)
     }
 }
 
 interface DownloadTaskWorkScheduler {
     suspend fun schedule(taskId: String)
+    fun cancel(taskId: String)
 }
 
 interface DownloadWorkEnqueuer {
-    fun enqueue(request: OneTimeWorkRequest)
+    fun enqueue(taskId: String, request: OneTimeWorkRequest)
+    fun cancel(taskId: String)
 }
 
 class WorkManagerDownloadWorkEnqueuer(
     private val workManager: WorkManager,
 ) : DownloadWorkEnqueuer {
-    override fun enqueue(request: OneTimeWorkRequest) {
-        workManager.enqueue(request)
+    override fun enqueue(taskId: String, request: OneTimeWorkRequest) {
+        workManager.enqueueUniqueWork(
+            uniqueWorkName(taskId),
+            ExistingWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    override fun cancel(taskId: String) {
+        workManager.cancelUniqueWork(uniqueWorkName(taskId))
+    }
+
+    private fun uniqueWorkName(taskId: String): String {
+        return "${DownloadWorker.WorkTag}-$taskId"
     }
 }
