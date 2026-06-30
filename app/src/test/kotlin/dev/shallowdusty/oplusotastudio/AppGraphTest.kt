@@ -26,6 +26,7 @@ import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
 import dev.shallowdusty.oplusotastudio.logging.AppLogger
 import dev.shallowdusty.oplusotastudio.logging.AppLogLevel
 import dev.shallowdusty.oplusotastudio.logging.AppLogSink
+import dev.shallowdusty.oplusotastudio.logging.LoggingDownloadEngine
 import dev.shallowdusty.oplusotastudio.logging.LoggingOtaLookupService
 import java.io.File
 import kotlinx.coroutines.flow.Flow
@@ -63,7 +64,10 @@ class AppGraphTest {
     fun `uses real download engine when temp root is provided`() {
         val graph = AppGraph(downloadTempRoot = File("build/tmp/app-graph-test"))
 
-        assertInstanceOf(SimpleDownloadEngine::class.java, graph.downloadEngine)
+        val loggingEngine = assertInstanceOf(LoggingDownloadEngine::class.java, graph.downloadEngine)
+        val delegateField = LoggingDownloadEngine::class.java.getDeclaredField("delegate")
+            .apply { isAccessible = true }
+        assertInstanceOf(SimpleDownloadEngine::class.java, delegateField.get(loggingEngine))
     }
 
     @Test
@@ -74,7 +78,10 @@ class AppGraphTest {
             downloadWorkScheduler = NoOpDownloadTaskWorkScheduler(),
         )
 
-        assertInstanceOf(WorkScheduledDownloadEngine::class.java, graph.downloadEngine)
+        val loggingEngine = assertInstanceOf(LoggingDownloadEngine::class.java, graph.downloadEngine)
+        val delegateField = LoggingDownloadEngine::class.java.getDeclaredField("delegate")
+            .apply { isAccessible = true }
+        assertInstanceOf(WorkScheduledDownloadEngine::class.java, delegateField.get(loggingEngine))
     }
 
     @Test
@@ -107,7 +114,10 @@ class AppGraphTest {
             downloadFilePromoter = promoter,
         )
 
-        val engine = assertInstanceOf(SimpleDownloadEngine::class.java, graph.downloadEngine)
+        val loggingEngine = assertInstanceOf(LoggingDownloadEngine::class.java, graph.downloadEngine)
+        val delegateField = LoggingDownloadEngine::class.java.getDeclaredField("delegate")
+            .apply { isAccessible = true }
+        val engine = assertInstanceOf(SimpleDownloadEngine::class.java, delegateField.get(loggingEngine))
         val field = SimpleDownloadEngine::class.java.getDeclaredField("filePromoter")
             .apply { isAccessible = true }
 
@@ -128,7 +138,10 @@ class AppGraphTest {
             storageSnapshotProvider = provider,
         )
 
-        val engine = assertInstanceOf(SimpleDownloadEngine::class.java, graph.downloadEngine)
+        val loggingEngine = assertInstanceOf(LoggingDownloadEngine::class.java, graph.downloadEngine)
+        val delegateField = LoggingDownloadEngine::class.java.getDeclaredField("delegate")
+            .apply { isAccessible = true }
+        val engine = assertInstanceOf(SimpleDownloadEngine::class.java, delegateField.get(loggingEngine))
         val field = SimpleDownloadEngine::class.java.getDeclaredField("storageSnapshotProvider")
             .apply { isAccessible = true }
 

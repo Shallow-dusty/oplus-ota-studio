@@ -27,6 +27,7 @@ import dev.shallowdusty.oplusotastudio.fake.FakeDownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.fake.FakePackageRepository
 import dev.shallowdusty.oplusotastudio.logging.AppLogLevel
 import dev.shallowdusty.oplusotastudio.logging.AppLogger
+import dev.shallowdusty.oplusotastudio.logging.LoggingDownloadEngine
 import dev.shallowdusty.oplusotastudio.logging.LoggingOtaLookupService
 import dev.shallowdusty.oplusotastudio.logging.NoOpAppLogSink
 import java.io.File
@@ -76,7 +77,7 @@ class AppGraph(
                 admissionGate = downloadAdmissionGate,
             )
         }
-    val downloadEngine: DownloadEngine =
+    private val downloadEngineDelegate: DownloadEngine =
         if (downloadTempRoot != null && downloadTaskStore != null && downloadWorkScheduler != null) {
             WorkScheduledDownloadEngine(
                 taskStore = downloadTaskStore,
@@ -87,6 +88,10 @@ class AppGraph(
         } else {
             realDownloadEngine ?: FakeDownloadEngine()
         }
+    val downloadEngine: DownloadEngine = LoggingDownloadEngine(
+        delegate = downloadEngineDelegate,
+        logger = appLogger,
+    )
     val downloadWorkerExecutor: DownloadWorkerExecutor? =
         downloadWorkerExecutor ?: realDownloadEngine?.let { engine ->
             SerialDownloadWorkerExecutor(
