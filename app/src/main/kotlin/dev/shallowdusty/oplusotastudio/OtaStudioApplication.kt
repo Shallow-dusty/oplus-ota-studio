@@ -6,6 +6,7 @@ import android.content.pm.ApplicationInfo
 import android.os.Environment
 import androidx.work.WorkManager
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
+import dev.shallowdusty.oplusotastudio.core.download.DownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.download.MutableDownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.storage.OtaStudioDatabase
 import dev.shallowdusty.oplusotastudio.core.storage.RoomDownloadTaskStore
@@ -13,6 +14,8 @@ import dev.shallowdusty.oplusotastudio.core.storage.RoomPackageRepository
 import dev.shallowdusty.oplusotastudio.core.storage.createDownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.core.storage.createLookupPrivacyConsentStore
 import dev.shallowdusty.oplusotastudio.core.storage.createOtaStudioDatabase
+import dev.shallowdusty.oplusotastudio.download.AndroidBatterySnapshotProvider
+import dev.shallowdusty.oplusotastudio.download.BatteryDownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.download.AndroidDownloadStorageSnapshotProvider
 import dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoter
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
@@ -40,6 +43,11 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
         val downloadTempRoots = downloadTempRoots()
         val downloadTempRoot = downloadTempRoots.first()
         val downloadPreferencesStore = createDownloadPreferencesStore(this)
+        val batteryAdmissionGate = BatteryDownloadAdmissionGate(
+            preferencesStore = downloadPreferencesStore,
+            batterySnapshotProvider = AndroidBatterySnapshotProvider(this),
+            scope = applicationScope,
+        )
         AppGraph(
             downloadTempRoot = downloadTempRoot,
             packageRepository = RoomPackageRepository(database.historyDao()),
@@ -55,7 +63,10 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
             downloadFilePromoter = AndroidMediaStoreDownloadFilePromoter(this),
             storageSnapshotProvider = AndroidDownloadStorageSnapshotProvider(this, downloadTempRoot),
             downloadTempFileJanitor = DownloadTempFileJanitor(downloadTempRoots),
-            downloadAdmissionGate = downloadAdmissionGate,
+            downloadAdmissionGate = DownloadAdmissionGate {
+                downloadAdmissionGate.rejectionReason()
+                    ?: batteryAdmissionGate.rejectionReason()
+            },
             downloadWorkScheduler = DownloadWorkScheduler(
                 preferencesStore = downloadPreferencesStore,
                 enqueuer = WorkManagerDownloadWorkEnqueuer(
