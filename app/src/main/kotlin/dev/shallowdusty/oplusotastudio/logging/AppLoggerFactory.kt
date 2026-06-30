@@ -19,3 +19,17 @@ fun createAppLogArchiveExporter(
         logStore = RollingFileLogStore(logDir = filesDir.resolve("logs")),
         nowMs = nowMs,
     )
+
+fun createAppDiagnosticsProvider(
+    filesDir: File,
+    nowMs: () -> Long = System::currentTimeMillis,
+): AppDiagnosticsProvider {
+    val logStore = RollingFileLogStore(logDir = filesDir.resolve("logs"))
+    return AppDiagnosticsProvider(
+        logStore = logStore,
+        logArchiveExporter = AppLogArchiveExporter(
+            logStore = logStore,
+            nowMs = nowMs,
+        ),
+    )
+}

@@ -23,6 +23,7 @@ import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutionResult
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.SerialDownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.WorkScheduledDownloadEngine
+import dev.shallowdusty.oplusotastudio.logging.AppDiagnosticsProvider
 import dev.shallowdusty.oplusotastudio.logging.AppLogger
 import dev.shallowdusty.oplusotastudio.logging.AppLogArchiveExporter
 import dev.shallowdusty.oplusotastudio.logging.AppLogLevel
@@ -205,6 +206,20 @@ class AppGraphTest {
         val graph = AppGraph(appLogArchiveExporter = exporter)
 
         assertSame(exporter, graph.appLogArchiveExporter)
+    }
+
+    @Test
+    fun `uses supplied app diagnostics provider`() {
+        val logStore = dev.shallowdusty.oplusotastudio.logging.RollingFileLogStore(
+            logDir = File("build/tmp/app-graph-diagnostics-test"),
+        )
+        val provider = AppDiagnosticsProvider(
+            logStore = logStore,
+            logArchiveExporter = AppLogArchiveExporter(logStore = logStore),
+        )
+        val graph = AppGraph(appDiagnosticsProvider = provider)
+
+        assertSame(provider, graph.appDiagnosticsProvider)
     }
 
     @Test
