@@ -1,9 +1,11 @@
 package dev.shallowdusty.oplusotastudio
 
 import android.app.Application
+import android.content.ComponentCallbacks2
 import android.os.Environment
 import androidx.work.WorkManager
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
+import dev.shallowdusty.oplusotastudio.core.download.MutableDownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.storage.OtaStudioDatabase
 import dev.shallowdusty.oplusotastudio.core.storage.RoomDownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.storage.RoomPackageRepository
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 
 class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val downloadAdmissionGate = MutableDownloadAdmissionGate()
 
     private val database: OtaStudioDatabase by lazy {
         createOtaStudioDatabase(this)
@@ -40,6 +43,7 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
             downloadFilePromoter = AndroidMediaStoreDownloadFilePromoter(this),
             storageSnapshotProvider = AndroidDownloadStorageSnapshotProvider(this, downloadTempRoot),
             downloadTempFileJanitor = DownloadTempFileJanitor(downloadTempRoots),
+            downloadAdmissionGate = downloadAdmissionGate,
             downloadWorkScheduler = DownloadWorkScheduler(
                 preferencesStore = downloadPreferencesStore,
                 enqueuer = WorkManagerDownloadWorkEnqueuer(
@@ -59,10 +63,23 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
         }
     }
 
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level in ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW..ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+            downloadAdmissionGate.rejectNewDownloads(LowResourceDownloadRejectionReason)
+        }
+    }
+
     private fun downloadTempRoots(): List<File> =
         listOfNotNull(
             externalCacheDir,
             getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
             cacheDir,
         ).distinctBy { it.absolutePath }
+
+    private companion object {
+        const val LowResourceDownloadRejectionReason =
+            "System resource pressure is critical; new downloads are paused."
+    }
 }

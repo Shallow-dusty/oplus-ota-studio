@@ -127,6 +127,36 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `rejects enqueue when admission gate blocks new downloads`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val admissionGate = MutableDownloadAdmissionGate("Storage pressure is critical.")
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("admission-rejected"),
+            scope = backgroundScope,
+            taskStore = store,
+            admissionGate = admissionGate,
+            idGenerator = { "rejected" },
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = "900150983cd24fb0d6963f7d28e17f72",
+            ),
+        )
+
+        val failed = task.state.first() as DownloadState.Failed
+        assertEquals(OtaErrorCategory.File, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertEquals("Storage pressure is critical.", failed.raw)
+        assertTrue(store.created.isEmpty())
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
     fun `throttles small progress updates while downloading`() = runTest {
         server.enqueue(
             MockResponse.Builder()

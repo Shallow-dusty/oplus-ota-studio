@@ -1,6 +1,7 @@
 package dev.shallowdusty.oplusotastudio
 
 import dev.shallowdusty.oplusotastudio.core.download.DownloadFilePromoter
+import dev.shallowdusty.oplusotastudio.core.download.DownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.download.DownloadStorageSnapshot
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitorResult
@@ -42,6 +43,7 @@ class AppGraph(
     private val downloadFilePromoter: DownloadFilePromoter? = null,
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
     private val downloadTempFileJanitor: DownloadTempFileJanitor? = null,
+    private val downloadAdmissionGate: DownloadAdmissionGate = DownloadAdmissionGate.AllowAll,
     val downloadWorkScheduler: DownloadTaskWorkScheduler? = null,
     downloadWorkerExecutor: DownloadWorkerExecutor? = null,
 ) {
@@ -56,6 +58,7 @@ class AppGraph(
                 taskStore = downloadTaskStore,
                 filePromoter = downloadFilePromoter,
                 storageSnapshotProvider = storageSnapshotProvider,
+                admissionGate = downloadAdmissionGate,
             )
         }
     val downloadEngine: DownloadEngine =
@@ -64,6 +67,7 @@ class AppGraph(
                 taskStore = downloadTaskStore,
                 scheduler = downloadWorkScheduler,
                 tempRoot = downloadTempRoot,
+                admissionGate = downloadAdmissionGate,
             )
         } else {
             realDownloadEngine ?: FakeDownloadEngine()

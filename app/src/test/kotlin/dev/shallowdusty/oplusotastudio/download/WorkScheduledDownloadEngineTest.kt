@@ -1,5 +1,6 @@
 package dev.shallowdusty.oplusotastudio.download
 
+import dev.shallowdusty.oplusotastudio.core.download.MutableDownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
@@ -61,6 +62,28 @@ class WorkScheduledDownloadEngineTest {
         assertEquals(OtaErrorCategory.File, failed.category)
         assertEquals(0, failed.retriesRemaining)
         assertTrue(failed.raw?.contains("queue limit") == true)
+        assertTrue(store.created.isEmpty())
+        assertTrue(scheduler.scheduled.isEmpty())
+    }
+
+    @Test
+    fun `enqueue rejects new task when admission gate blocks downloads`() = runTest {
+        val store = RecordingDownloadTaskStore()
+        val scheduler = RecordingDownloadWorkScheduler()
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/admission-rejected"),
+            idGenerator = { "rejected" },
+            admissionGate = MutableDownloadAdmissionGate("Storage pressure is critical."),
+        )
+
+        val task = engine.enqueue(samplePackage())
+
+        val failed = task.state.first() as DownloadState.Failed
+        assertEquals(OtaErrorCategory.File, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertEquals("Storage pressure is critical.", failed.raw)
         assertTrue(store.created.isEmpty())
         assertTrue(scheduler.scheduled.isEmpty())
     }

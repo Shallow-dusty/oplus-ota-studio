@@ -42,6 +42,7 @@ class SimpleDownloadEngine(
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
     private val maxAttempts: Int = 3,
     private val maxQueuedTasks: Int = DefaultMaxQueuedTasks,
+    private val admissionGate: DownloadAdmissionGate = DownloadAdmissionGate.AllowAll,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : DownloadEngine {
 
@@ -54,10 +55,18 @@ class SimpleDownloadEngine(
         tempRoot.mkdirs()
         return queueMutex.withLock {
             val taskId = idGenerator()
-            if (activeQueueSize() >= maxQueuedTasks) {
-                return@withLock QueueRejectedDownloadTask(
+            admissionGate.rejectionReason()?.let { reason ->
+                return@withLock RejectedDownloadTask(
                     taskId = taskId,
-                    maxQueuedTasks = maxQueuedTasks,
+                    raw = reason,
+                ).also { task ->
+                    tasks.value = tasks.value + task
+                }
+            }
+            if (activeQueueSize() >= maxQueuedTasks) {
+                return@withLock RejectedDownloadTask(
+                    taskId = taskId,
+                    raw = "Download queue limit reached ($maxQueuedTasks tasks)",
                 ).also { task ->
                     tasks.value = tasks.value + task
                 }
@@ -473,15 +482,15 @@ class SimpleDownloadEngine(
     }
 }
 
-private class QueueRejectedDownloadTask(
+private class RejectedDownloadTask(
     override val taskId: String,
-    maxQueuedTasks: Int,
+    raw: String,
 ) : DownloadTask {
     private val currentState = MutableStateFlow(
         DownloadState.Failed(
             category = OtaErrorCategory.File,
             retriesRemaining = 0,
-            raw = "Download queue limit reached ($maxQueuedTasks tasks)",
+            raw = raw,
         ),
     )
     override val state: Flow<DownloadState> = currentState.asStateFlow()

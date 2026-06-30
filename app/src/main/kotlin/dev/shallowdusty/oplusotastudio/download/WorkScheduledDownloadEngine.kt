@@ -1,5 +1,6 @@
 package dev.shallowdusty.oplusotastudio.download
 
+import dev.shallowdusty.oplusotastudio.core.download.DownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
@@ -21,18 +22,25 @@ class WorkScheduledDownloadEngine(
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
     private val nowMs: () -> Long = { System.currentTimeMillis() },
     private val maxQueuedTasks: Int = DefaultMaxQueuedTasks,
+    private val admissionGate: DownloadAdmissionGate = DownloadAdmissionGate.AllowAll,
 ) : DownloadEngine {
 
     override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
         tempRoot.mkdirs()
         val taskId = idGenerator()
+        admissionGate.rejectionReason()?.let { reason ->
+            return RejectedDownloadTask(
+                taskId = taskId,
+                raw = reason,
+            )
+        }
         val activeTasks = taskStore.observeTasks()
             .first()
             .count { task -> !task.state.isTerminal }
         if (activeTasks >= maxQueuedTasks) {
-            return QueueRejectedDownloadTask(
+            return RejectedDownloadTask(
                 taskId = taskId,
-                maxQueuedTasks = maxQueuedTasks,
+                raw = "Download queue limit reached ($maxQueuedTasks tasks)",
             )
         }
         val tempFile = tempRoot.resolve("$taskId.zip.part")
@@ -99,15 +107,15 @@ class WorkScheduledDownloadEngine(
     }
 }
 
-private class QueueRejectedDownloadTask(
+private class RejectedDownloadTask(
     override val taskId: String,
-    maxQueuedTasks: Int,
+    raw: String,
 ) : DownloadTask {
     private val currentState = MutableStateFlow(
         DownloadState.Failed(
             category = OtaErrorCategory.File,
             retriesRemaining = 0,
-            raw = "Download queue limit reached ($maxQueuedTasks tasks)",
+            raw = raw,
         ),
     )
     override val state: Flow<DownloadState> = currentState.asStateFlow()
