@@ -9,7 +9,7 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `f6031f9 feat: edit lookup region and host override`
+- Latest implementation commit at this snapshot: `e16a8db build: raise Gradle heap for connected tests`
 - Working tree at the start of this documentation pass: clean
 - Local connected-device check on 2026-07-01: `adb devices` reported no attached devices
 
@@ -22,8 +22,8 @@ yet.
 
 The remaining release blockers are mostly evidence and end-to-end validation:
 real device detection evidence, live/captured/replayed OTA lookup evidence,
-device/emulator storage promotion results, advanced profile controls,
-release-copy limitations, and release packaging polish.
+API 29/API 34 storage promotion results, release-copy limitations, and release
+packaging polish.
 
 ## Implemented
 
@@ -84,6 +84,10 @@ release-copy limitations, and release packaging polish.
 - Final ZIP promotion targets `MediaStore.Downloads/OPlus OTA Studio` on Android
   10+.
 - An instrumentation test covers MediaStore promotion on API 29+ behavior.
+- Local API 30 emulator evidence on 2026-07-01:
+  `connectedDebugAndroidTest` passed
+  `AndroidMediaStoreDownloadFilePromoterInstrumentedTest.promotesZipIntoDownloadsCollectionOnScopedStorage`
+  on `Vector_API30(AVD) - 11`, SDK 30.
 - CI includes unit/lint plus emulator instrumentation jobs for API 29 and API 34.
 - Manifest disables cleartext traffic and declares foreground data-sync service
   support.
@@ -102,6 +106,8 @@ release-copy limitations, and release packaging polish.
 - No real device is currently attached locally, so device detection and
   MediaStore flows have not been locally run on a physical OnePlus/OPlus device
   in this snapshot.
+- Local emulator validation currently covers API 30 only; API 29 and API 34
+  instrumentation evidence is still missing.
 - No committed `captured-real-*` or `replayed-real-profile-*` successful OTA
   response fixture exists yet.
 - The ColorOS component parser is synthetic-schema coverage, not proof of a live
@@ -116,8 +122,8 @@ release-copy limitations, and release packaging polish.
 
 ### Download/Product Flow
 
-- Full ZIP end-to-end validation with a forced network drop and final
-  `MediaStore.Downloads` promotion still needs device/emulator evidence.
+- Full ZIP end-to-end validation with a forced network drop still needs
+  device/emulator evidence.
 - API 26 storage behavior still needs a recorded local result or documented
   emulator blocker before v0.1 can be called done.
 - Checksum mismatch expected/actual hashes are exposed in task failure details,
