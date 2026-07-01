@@ -65,6 +65,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LookupScreen(
     factory: () -> LookupViewModel,
+    beforeDownload: ((() -> Unit) -> Unit) = { action -> action() },
     onDownloadQueued: () -> Unit = {},
 ) {
     val viewModel: LookupViewModel = viewModel(factory = viewModelFactory { initializer { factory() } })
@@ -87,8 +88,10 @@ fun LookupScreen(
                     pkg = s.pkg,
                     liveLookupExperimental = s.liveLookupExperimental,
                     onDownload = { pkg ->
-                        viewModel.enqueueDownload(pkg)
-                        onDownloadQueued()
+                        beforeDownload {
+                            viewModel.enqueueDownload(pkg)
+                            onDownloadQueued()
+                        }
                     },
                     onReset = viewModel::reset,
                 )

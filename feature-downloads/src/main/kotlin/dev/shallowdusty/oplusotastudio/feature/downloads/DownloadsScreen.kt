@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun DownloadsScreen(
     factory: () -> DownloadsViewModel,
+    beforeDownload: ((() -> Unit) -> Unit) = { action -> action() },
 ) {
     val viewModel: DownloadsViewModel = viewModel(factory = viewModelFactory { initializer { factory() } })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,7 +92,11 @@ fun DownloadsScreen(
                     items(state.historyRows, key = { it.id }) { row ->
                         HistoryRowCard(
                             row = row,
-                            onDownload = viewModel::enqueueHistoryPackage,
+                            onDownload = { id ->
+                                beforeDownload {
+                                    viewModel.enqueueHistoryPackage(id)
+                                }
+                            },
                         )
                     }
                 }

@@ -1,12 +1,17 @@
 package dev.shallowdusty.oplusotastudio.download
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import java.io.File
+import java.io.FileInputStream
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -21,11 +26,15 @@ class AndroidMediaStoreDownloadFilePromoterInstrumentedTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val createdUris = mutableListOf<Uri>()
+    private val createdFiles = mutableListOf<File>()
 
     @After
     fun tearDown() {
         createdUris.forEach { uri ->
             context.contentResolver.delete(uri, null, null)
+        }
+        createdFiles.forEach { file ->
+            file.delete()
         }
     }
 
@@ -74,5 +83,52 @@ class AndroidMediaStoreDownloadFilePromoterInstrumentedTest {
             input.readBytes().decodeToString()
         }
         assertEquals("ota-bytes", bytes)
+    }
+
+    @Test
+    fun promotesZipIntoPublicDownloadsOnLegacyStorage() = runBlocking {
+        assumeTrue(Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+        grantWriteExternalStorage()
+        val source = File(context.cacheDir, "instrumented-legacy-ota.zip").apply {
+            writeText("legacy-ota-bytes")
+        }
+        val promoter = AndroidMediaStoreDownloadFilePromoter(context)
+
+        val promoted = promoter.promote(
+            taskId = "instrumented-legacy-task",
+            pkg = OtaPackage(
+                versionName = "LE2120_14.0.0.1901(CN01)",
+                type = "full",
+                sizeBytes = source.length(),
+                sourceHost = "otacn.oppo.com",
+                downloadUrl = "https://example.invalid/package.zip",
+                md5 = null,
+            ),
+            sourceFile = source,
+        )
+
+        val destination = File(promoted.finalFilePath).also(createdFiles::add)
+        val expectedDir = Environment
+            .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            .resolve("OPlus OTA Studio")
+
+        assertTrue(destination.exists())
+        assertEquals(expectedDir.absolutePath, destination.parentFile?.absolutePath)
+        assertEquals("LE2120_14.0.0.1901_CN01_full.zip", destination.name)
+        assertEquals("legacy-ota-bytes", destination.readText())
+    }
+
+    private fun grantWriteExternalStorage() {
+        InstrumentationRegistry.getInstrumentation().uiAutomation
+            .executeShellCommand("pm grant ${context.packageName} ${Manifest.permission.WRITE_EXTERNAL_STORAGE}")
+            .use { descriptor ->
+                FileInputStream(descriptor.fileDescriptor).bufferedReader().use { reader ->
+                    reader.readText()
+                }
+            }
+        assertEquals(
+            PackageManager.PERMISSION_GRANTED,
+            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+        )
     }
 }

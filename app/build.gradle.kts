@@ -29,6 +29,10 @@ android {
     buildFeatures {
         compose = true
     }
+
+    adbOptions {
+        installOptions.add("-g")
+    }
 }
 
 dependencies {
