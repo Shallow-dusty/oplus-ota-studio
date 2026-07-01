@@ -53,3 +53,44 @@ jobs:
           path: |
             **/build/test-results/**/*.xml
             **/build/reports/tests/**
+
+  instrumentation-tests:
+    name: Instrumentation tests API ${{ matrix.api-level }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29, 34]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run connected tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          script: ./gradlew connectedDebugAndroidTest --stacktrace
+
+      - name: Upload connected test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connected-test-results-api-${{ matrix.api-level }}
+          path: |
+            **/build/outputs/androidTest-results/**
+            **/build/reports/androidTests/**
