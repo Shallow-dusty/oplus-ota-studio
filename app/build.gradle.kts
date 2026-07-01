@@ -3,6 +3,35 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val releaseSigningValues = mapOf(
+    "storeFile" to (
+        providers.gradleProperty("oplusOtaStudio.releaseStoreFile").orNull
+            ?: providers.environmentVariable("OPLUS_OTA_STUDIO_RELEASE_STORE_FILE").orNull
+        ),
+    "storePassword" to (
+        providers.gradleProperty("oplusOtaStudio.releaseStorePassword").orNull
+            ?: providers.environmentVariable("OPLUS_OTA_STUDIO_RELEASE_STORE_PASSWORD").orNull
+        ),
+    "keyAlias" to (
+        providers.gradleProperty("oplusOtaStudio.releaseKeyAlias").orNull
+            ?: providers.environmentVariable("OPLUS_OTA_STUDIO_RELEASE_KEY_ALIAS").orNull
+        ),
+    "keyPassword" to (
+        providers.gradleProperty("oplusOtaStudio.releaseKeyPassword").orNull
+            ?: providers.environmentVariable("OPLUS_OTA_STUDIO_RELEASE_KEY_PASSWORD").orNull
+        ),
+)
+
+val hasAnyReleaseSigningValue = releaseSigningValues.values.any { !it.isNullOrBlank() }
+val hasCompleteReleaseSigning = releaseSigningValues.values.all { !it.isNullOrBlank() }
+
+if (hasAnyReleaseSigningValue && !hasCompleteReleaseSigning) {
+    error(
+        "Release signing is partially configured. Set all oplusOtaStudio.release* " +
+            "Gradle properties or all OPLUS_OTA_STUDIO_RELEASE_* environment variables.",
+    )
+}
+
 android {
     namespace = "dev.shallowdusty.oplusotastudio"
     compileSdk = 37
@@ -11,9 +40,20 @@ android {
         applicationId = "dev.shallowdusty.oplusotastudio"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.0.1"
+        versionCode = 10
+        versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (hasCompleteReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseSigningValues.getValue("storeFile")!!)
+                storePassword = releaseSigningValues.getValue("storePassword")
+                keyAlias = releaseSigningValues.getValue("keyAlias")
+                keyPassword = releaseSigningValues.getValue("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -23,6 +63,9 @@ android {
         release {
             // R8/minification is enabled in the v0.3 release-candidate polish.
             isMinifyEnabled = false
+            if (hasCompleteReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
