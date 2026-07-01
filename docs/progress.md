@@ -9,7 +9,7 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `e16a8db build: raise Gradle heap for connected tests`
+- Latest implementation commit at this snapshot: `594af6a feat: clarify OTA verification scope`
 - Working tree at the start of this documentation pass: clean
 - Local connected-device check on 2026-07-01: `adb devices` reported no attached devices
 
@@ -22,8 +22,7 @@ yet.
 
 The remaining release blockers are mostly evidence and end-to-end validation:
 real device detection evidence, live/captured/replayed OTA lookup evidence,
-API 29/API 34 storage promotion results, release-copy limitations, and release
-packaging polish.
+API 29/API 34 storage promotion results, and release packaging polish.
 
 ## Implemented
 
@@ -77,6 +76,8 @@ packaging polish.
   next visible step is queue/progress management.
 - Manual lookup profile editing now includes region selection and an advanced
   host override field backed by existing profile validation.
+- Lookup and download screens state that hash checks verify transfer integrity
+  only and do not verify OPlus package signatures.
 - DataStore backs download preferences and lookup privacy consent.
 
 ### Files And Platform Integration
@@ -114,11 +115,6 @@ packaging polish.
   server chain.
 - v0.2 still requires at least one live-endpoint verified region if v0.1 ships
   on fixture-backed evidence.
-
-### Lookup/Product Flow
-
-- Release copy/details must still consistently state that v1 verifies transfer
-  integrity only, not OPlus package signatures.
 
 ### Download/Product Flow
 
