@@ -114,7 +114,14 @@ private fun OtaStudioApp() {
             composable(Dest.Downloads.route) {
                 val graph = androidx.compose.ui.platform.LocalContext.current.applicationContext
                     .let { it as OtaStudioApplication }.graph
-                DownloadsScreen(factory = { DownloadsViewModel(graph.downloadEngine) })
+                DownloadsScreen(
+                    factory = {
+                        DownloadsViewModel(
+                            engine = graph.downloadEngine,
+                            packageRepository = graph.packageRepository,
+                        )
+                    },
+                )
             }
         }
     }

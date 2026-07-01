@@ -1,5 +1,6 @@
 package dev.shallowdusty.oplusotastudio.feature.downloads
 
+import android.content.ClipData
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,10 +10,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -22,9 +27,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.launch
 
 /**
  * The downloads screen (spec §5 step 5-6, §6). Renders the engine's task queue;
@@ -51,7 +59,7 @@ fun DownloadsScreen(
     Scaffold(
         topBar = { TopAppBar(title = { Text("Downloads") }) },
     ) { padding ->
-        if (state.rows.isEmpty()) {
+        if (state.rows.isEmpty() && state.historyRows.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("No downloads yet.", style = MaterialTheme.typography.bodyMedium)
             }
@@ -61,17 +69,35 @@ fun DownloadsScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(state.rows, key = { it.taskId }) { row ->
-                    DownloadRowCard(
-                        row = row,
-                        onPause = viewModel::pause,
-                        onResume = viewModel::resume,
-                        onCancel = viewModel::cancel,
-                    )
+                if (state.rows.isNotEmpty()) {
+                    item {
+                        SectionTitle("Active downloads")
+                    }
+                    items(state.rows, key = { it.taskId }) { row ->
+                        DownloadRowCard(
+                            row = row,
+                            onPause = viewModel::pause,
+                            onResume = viewModel::resume,
+                            onCancel = viewModel::cancel,
+                        )
+                    }
+                }
+                if (state.historyRows.isNotEmpty()) {
+                    item {
+                        SectionTitle("Package history")
+                    }
+                    items(state.historyRows, key = { it.id }) { row ->
+                        HistoryRowCard(row)
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
 }
 
 @Composable
@@ -108,6 +134,63 @@ private fun DownloadRowCard(
             DownloadState.Unverified -> UnverifiedContent()
             DownloadState.Canceled -> StateLabel("Canceled", color = MaterialTheme.colorScheme.onSurfaceVariant)
             is DownloadState.Failed -> FailedContent(s)
+        }
+    }
+}
+
+@Composable
+private fun HistoryRowCard(row: HistoryRow) {
+    val clipboard = LocalClipboard.current
+    val coroutineScope = rememberCoroutineScope()
+    Column(Modifier.fillMaxWidth()) {
+        Text(row.packageName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "${formatBytes(row.packageSize)} · ${row.sourceHost} · ${row.evidenceLabel}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        row.localFilePath?.let { path ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                path,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = {
+                    coroutineScope.launch {
+                        clipboard.setClipEntry(
+                            ClipEntry(ClipData.newPlainText("OTA package link", row.downloadUrl)),
+                        )
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Copy link")
+            }
+            row.localFilePath?.let { path ->
+                OutlinedButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            clipboard.setClipEntry(
+                                ClipEntry(ClipData.newPlainText("Downloaded OTA path", path)),
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text("Copy path")
+                }
+            }
         }
     }
 }

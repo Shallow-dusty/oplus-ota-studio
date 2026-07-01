@@ -3,7 +3,11 @@ package dev.shallowdusty.oplusotastudio.feature.downloads
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
+import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
+import dev.shallowdusty.oplusotastudio.core.model.OtaEvidenceLevel
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
+import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
+import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -11,6 +15,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -188,6 +193,24 @@ class DownloadsViewModelTest {
         assertEquals(0, task.cancelCalls)
     }
 
+    @Test
+    fun `lookup history appears as package rows with copyable links`() = runTest {
+        val engine = FakeDownloadEngine()
+        val repository = FakePackageRepository(
+            history = listOf(
+                sampleHistoryEntry(),
+            ),
+        )
+
+        val vm = DownloadsViewModel(engine, repository)
+        advanceUntilIdle()
+
+        val historyRow = vm.uiState.value.historyRows.single()
+        assertEquals("CPH2581_15.0.0.840(EX01).zip", historyRow.packageName)
+        assertEquals("https://otagm.oppo.com/cph2581.zip", historyRow.downloadUrl)
+        assertEquals("content://downloads/oplus/cph2581.zip", historyRow.localFilePath)
+    }
+
     private fun samplePackage() = OtaPackage(
         versionName = "12.0.0.0.LE28AA",
         type = "full",
@@ -196,6 +219,23 @@ class DownloadsViewModelTest {
         downloadUrl = "https://otagm.oppo.com/pkg.zip",
         md5 = "abc",
         sha256 = null,
+    )
+
+    private fun sampleHistoryEntry() = HistoryEntry(
+        id = "history-1",
+        profileModel = "CPH2581",
+        profileRegion = OtaRegion.India,
+        packageName = "CPH2581_15.0.0.840(EX01).zip",
+        packageSize = 6_200_000_000L,
+        sourceHost = "otagm.oppo.com",
+        downloadUrl = "https://otagm.oppo.com/cph2581.zip",
+        md5 = "abc",
+        sha256 = null,
+        releaseNotes = null,
+        evidenceLevel = OtaEvidenceLevel.LiveVerified,
+        lookedUpAtMs = 1_720_000_000_000L,
+        downloadedAtMs = 1_720_000_100_000L,
+        localFilePath = "content://downloads/oplus/cph2581.zip",
     )
 
     private class FakeDownloadEngine : DownloadEngine {
@@ -245,5 +285,15 @@ class DownloadsViewModelTest {
         suspend fun emit(state: DownloadState) {
             _state.emit(state)
         }
+    }
+
+    private class FakePackageRepository(
+        private val history: List<HistoryEntry>,
+    ) : PackageRepository {
+        override suspend fun record(entry: HistoryEntry) = Unit
+
+        override suspend fun markDownloaded(packageName: String, downloadedAtMs: Long, localFilePath: String) = Unit
+
+        override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(history)
     }
 }

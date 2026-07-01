@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
+import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
+import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,12 +22,23 @@ data class DownloadRow(
     val state: DownloadState,
 )
 
+data class HistoryRow(
+    val id: String,
+    val packageName: String,
+    val packageSize: Long,
+    val sourceHost: String,
+    val downloadUrl: String,
+    val evidenceLabel: String,
+    val localFilePath: String?,
+)
+
 /**
  * UI state for the downloads screen (spec §6). The list reflects the engine's
  * task queue; each row renders from its [DownloadState] branch.
  */
 data class DownloadsUiState(
     val rows: List<DownloadRow> = emptyList(),
+    val historyRows: List<HistoryRow> = emptyList(),
 )
 
 /**
@@ -36,6 +49,7 @@ data class DownloadsUiState(
  */
 class DownloadsViewModel(
     private val engine: DownloadEngine,
+    private val packageRepository: PackageRepository? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DownloadsUiState())
@@ -47,6 +61,7 @@ class DownloadsViewModel(
 
     init {
         observeQueue()
+        observeHistory()
     }
 
     private fun observeQueue() {
@@ -81,7 +96,19 @@ class DownloadsViewModel(
     private fun emitRows() {
         _uiState.value = DownloadsUiState(
             rows = latest.entries.map { DownloadRow(it.key, it.value) },
+            historyRows = _uiState.value.historyRows,
         )
+    }
+
+    private fun observeHistory() {
+        val repository = packageRepository ?: return
+        viewModelScope.launch {
+            repository.observeHistory().collect { entries ->
+                _uiState.value = _uiState.value.copy(
+                    historyRows = entries.map { it.toHistoryRow() },
+                )
+            }
+        }
     }
 
     fun pause(taskId: String) {
@@ -99,3 +126,14 @@ class DownloadsViewModel(
         viewModelScope.launch { task.cancel() }
     }
 }
+
+private fun HistoryEntry.toHistoryRow(): HistoryRow =
+    HistoryRow(
+        id = id,
+        packageName = packageName,
+        packageSize = packageSize,
+        sourceHost = sourceHost,
+        downloadUrl = downloadUrl,
+        evidenceLabel = evidenceLevel.stableId,
+        localFilePath = localFilePath,
+    )
