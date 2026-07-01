@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
         HistoryEntity::class,
         DownloadTaskEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class OtaStudioDatabase : RoomDatabase() {

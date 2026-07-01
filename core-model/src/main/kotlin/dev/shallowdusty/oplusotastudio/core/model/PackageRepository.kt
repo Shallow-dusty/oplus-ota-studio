@@ -21,7 +21,8 @@ interface PackageRepository {
 
 /**
  * One history row: a lookup result (and, if downloaded, the local file info).
- * Kept deliberately small — the details view pulls more from logs (spec §9).
+ * Keeps enough package metadata to re-open details and copy the package link
+ * after process death (spec §5 step 7).
  */
 data class HistoryEntry(
     val id: String,
@@ -29,6 +30,12 @@ data class HistoryEntry(
     val profileRegion: OtaRegion,
     val packageName: String,
     val packageSize: Long,
+    val sourceHost: String,
+    val downloadUrl: String,
+    val md5: String?,
+    val sha256: String?,
+    val releaseNotes: String?,
+    val evidenceLevel: OtaEvidenceLevel,
     val lookedUpAtMs: Long,
     val downloadedAtMs: Long?,
     val localFilePath: String?,

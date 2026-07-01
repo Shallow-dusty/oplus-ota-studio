@@ -1,6 +1,7 @@
 package dev.shallowdusty.oplusotastudio.core.storage
 
 import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
+import dev.shallowdusty.oplusotastudio.core.model.OtaEvidenceLevel
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +40,12 @@ private fun HistoryEntry.toEntity(): HistoryEntity =
         profileRegion = profileRegion.name,
         packageName = packageName,
         packageSize = packageSize,
+        sourceHost = sourceHost,
+        downloadUrl = downloadUrl,
+        md5 = md5,
+        sha256 = sha256,
+        releaseNotes = releaseNotes,
+        evidenceLevel = evidenceLevel.name,
         lookedUpAtMs = lookedUpAtMs,
         downloadedAtMs = downloadedAtMs,
         localFilePath = localFilePath,
@@ -51,6 +58,13 @@ private fun HistoryEntity.toDomain(): HistoryEntry =
         profileRegion = runCatching { OtaRegion.valueOf(profileRegion) }.getOrDefault(OtaRegion.Global),
         packageName = packageName,
         packageSize = packageSize,
+        sourceHost = sourceHost,
+        downloadUrl = downloadUrl,
+        md5 = md5,
+        sha256 = sha256,
+        releaseNotes = releaseNotes,
+        evidenceLevel = runCatching { OtaEvidenceLevel.valueOf(evidenceLevel) }
+            .getOrDefault(OtaEvidenceLevel.Synthetic),
         lookedUpAtMs = lookedUpAtMs,
         downloadedAtMs = downloadedAtMs,
         localFilePath = localFilePath,

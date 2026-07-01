@@ -1,6 +1,7 @@
 package dev.shallowdusty.oplusotastudio.core.storage
 
 import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
+import dev.shallowdusty.oplusotastudio.core.model.OtaEvidenceLevel
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -25,6 +26,12 @@ class RoomPackageRepositoryTest {
                 profileRegion = "China",
                 packageName = "LE2120_14.0.0.1901(CN01)",
                 packageSize = 6_559_817_109L,
+                sourceHost = "component-otapc-cn.allawntech.com",
+                downloadUrl = "https://gauss-compotacostauto-cn.allawnfs.com/component-ota.zip",
+                md5 = "abc123",
+                sha256 = null,
+                releaseNotes = "Stability update",
+                evidenceLevel = "CapturedReal",
                 lookedUpAtMs = 1000L,
                 downloadedAtMs = 2000L,
                 localFilePath = "/storage/emulated/0/Download/OPlus/package.zip",
@@ -47,6 +54,8 @@ class RoomPackageRepositoryTest {
         assertEquals(listOf("new", "old"), rows.map { it.id })
         assertEquals(OtaRegion.China, rows.first().profileRegion)
         assertEquals("LE2120_14.0.0.1901(CN01)", rows.first().packageName)
+        assertEquals("https://gauss-compotacostauto-cn.allawnfs.com/component-ota.zip", rows.first().downloadUrl)
+        assertEquals(OtaEvidenceLevel.CapturedReal, rows.first().evidenceLevel)
     }
 
     @Test
@@ -85,6 +94,12 @@ class RoomPackageRepositoryTest {
             profileRegion = OtaRegion.China,
             packageName = "LE2120_14.0.0.1901(CN01)",
             packageSize = 6_559_817_109L,
+            sourceHost = "component-otapc-cn.allawntech.com",
+            downloadUrl = "https://gauss-compotacostauto-cn.allawnfs.com/component-ota.zip",
+            md5 = "abc123",
+            sha256 = null,
+            releaseNotes = "Stability update",
+            evidenceLevel = OtaEvidenceLevel.CapturedReal,
             lookedUpAtMs = lookedUpAtMs,
             downloadedAtMs = 2000L,
             localFilePath = "/storage/emulated/0/Download/OPlus/package.zip",
@@ -97,6 +112,12 @@ class RoomPackageRepositoryTest {
             profileRegion = "China",
             packageName = "LE2120_14.0.0.1901(CN01)",
             packageSize = 6_559_817_109L,
+            sourceHost = "component-otapc-cn.allawntech.com",
+            downloadUrl = "https://gauss-compotacostauto-cn.allawnfs.com/component-ota.zip",
+            md5 = "abc123",
+            sha256 = null,
+            releaseNotes = "Stability update",
+            evidenceLevel = "CapturedReal",
             lookedUpAtMs = lookedUpAtMs,
             downloadedAtMs = null,
             localFilePath = null,
