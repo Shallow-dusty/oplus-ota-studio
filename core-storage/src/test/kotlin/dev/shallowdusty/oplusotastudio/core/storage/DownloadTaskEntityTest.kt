@@ -56,6 +56,40 @@ class DownloadTaskEntityTest {
         )
     }
 
+    @Test
+    fun `withState stores checksum mismatch hashes`() {
+        val entity = DownloadTaskEntity.fromPackage(
+            taskId = "task-1",
+            pkg = samplePackage(),
+            tempFilePath = "/cache/task-1.zip.part",
+            updatedAtMs = 100L,
+        )
+
+        val failed = entity.withState(
+            state = DownloadState.Failed(
+                category = dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.ChecksumMismatch,
+                retriesRemaining = 0,
+                raw = "quarantined",
+                expectedHash = "expected-md5",
+                actualHash = "actual-md5",
+            ),
+            updatedAtMs = 200L,
+        )
+
+        assertEquals("expected-md5", failed.expectedHash)
+        assertEquals("actual-md5", failed.actualHash)
+        assertEquals(
+            DownloadState.Failed(
+                category = dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.ChecksumMismatch,
+                retriesRemaining = 0,
+                raw = "quarantined",
+                expectedHash = "expected-md5",
+                actualHash = "actual-md5",
+            ),
+            failed.toDownloadState(),
+        )
+    }
+
     private fun samplePackage(): OtaPackage =
         OtaPackage(
             versionName = "14.0.0.1901",

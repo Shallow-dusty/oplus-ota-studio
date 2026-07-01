@@ -99,10 +99,12 @@ class SimpleDownloadEngineTest {
         server.enqueue(MockResponse(code = 200, body = "abc"))
         server.start()
         val tempRoot = testTempRoot("mismatch")
+        val repository = RecordingPackageRepository()
         val engine = SimpleDownloadEngine(
             client = OkHttpClient(),
             tempRoot = tempRoot,
             scope = backgroundScope,
+            packageRepository = repository,
         )
 
         val task = engine.enqueue(
@@ -119,7 +121,13 @@ class SimpleDownloadEngineTest {
         val failed = finalState as DownloadState.Failed
         assertEquals(OtaErrorCategory.ChecksumMismatch, failed.category)
         assertEquals(0, failed.retriesRemaining)
+        assertEquals("00000000000000000000000000000000", failed.expectedHash)
+        assertEquals("900150983cd24fb0d6963f7d28e17f72", failed.actualHash)
         assertTrue(failed.raw?.contains("expected 00000000000000000000000000000000") == true)
+        assertEquals(
+            listOf(ChecksumMismatchRecord("test", "00000000000000000000000000000000", "900150983cd24fb0d6963f7d28e17f72")),
+            repository.checksumMismatches,
+        )
         assertFalse(tempRoot.resolve("${task.taskId}.zip.part").exists())
         assertEquals("abc", tempRoot.resolve("${task.taskId}.zip.bad").readText())
     }
@@ -1184,6 +1192,7 @@ class SimpleDownloadEngineTest {
 
     private class RecordingPackageRepository : PackageRepository {
         val downloaded = mutableListOf<DownloadedPackage>()
+        val checksumMismatches = mutableListOf<ChecksumMismatchRecord>()
 
         override suspend fun record(entry: HistoryEntry) = Unit
 
@@ -1197,6 +1206,14 @@ class SimpleDownloadEngineTest {
                 downloadedAtMs = downloadedAtMs,
                 localFilePath = localFilePath,
             )
+        }
+
+        override suspend fun markChecksumMismatch(
+            packageName: String,
+            expectedHash: String,
+            actualHash: String,
+        ) {
+            checksumMismatches += ChecksumMismatchRecord(packageName, expectedHash, actualHash)
         }
 
         override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(emptyList())
@@ -1259,5 +1276,11 @@ class SimpleDownloadEngineTest {
         val packageName: String,
         val downloadedAtMs: Long,
         val localFilePath: String,
+    )
+
+    private data class ChecksumMismatchRecord(
+        val packageName: String,
+        val expectedHash: String,
+        val actualHash: String,
     )
 }

@@ -373,13 +373,22 @@ class SimpleDownloadEngine(
                     }
                     updateState(DownloadState.Unverified)
                 }
-                is ChecksumResult.Mismatch -> DownloadState.Failed(
-                    category = OtaErrorCategory.ChecksumMismatch,
-                    retriesRemaining = 0,
-                    raw = "expected ${result.expectedHash}, got ${result.actualHash} " +
-                        "(${result.algorithm.name}); quarantined at ${quarantineBadFile().path}",
-                )
-                    .let { updateState(it) }
+                is ChecksumResult.Mismatch -> {
+                    packageRepository?.markChecksumMismatch(
+                        packageName = pkg.versionName,
+                        expectedHash = result.expectedHash,
+                        actualHash = result.actualHash,
+                    )
+                    DownloadState.Failed(
+                        category = OtaErrorCategory.ChecksumMismatch,
+                        retriesRemaining = 0,
+                        raw = "expected ${result.expectedHash}, got ${result.actualHash} " +
+                            "(${result.algorithm.name}); quarantined at ${quarantineBadFile().path}",
+                        expectedHash = result.expectedHash,
+                        actualHash = result.actualHash,
+                    )
+                        .let { updateState(it) }
+                }
             }
             return DownloadAttemptOutcome.Finished
         }

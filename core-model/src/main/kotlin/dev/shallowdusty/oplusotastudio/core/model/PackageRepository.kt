@@ -16,6 +16,13 @@ interface PackageRepository {
     /** Mark the latest matching package row as downloaded after file promotion. */
     suspend fun markDownloaded(packageName: String, downloadedAtMs: Long, localFilePath: String)
 
+    /** Persist checksum mismatch diagnostics for the latest matching package row. */
+    suspend fun markChecksumMismatch(
+        packageName: String,
+        expectedHash: String,
+        actualHash: String,
+    ) = Unit
+
     fun observeHistory(): Flow<List<HistoryEntry>>
 }
 
@@ -39,4 +46,6 @@ data class HistoryEntry(
     val lookedUpAtMs: Long,
     val downloadedAtMs: Long?,
     val localFilePath: String?,
+    val checksumExpectedHash: String? = null,
+    val checksumActualHash: String? = null,
 )

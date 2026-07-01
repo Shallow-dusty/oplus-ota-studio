@@ -57,5 +57,7 @@ sealed interface DownloadState {
         val category: OtaErrorCategory,
         val retriesRemaining: Int,
         val raw: String?,
+        val expectedHash: String? = null,
+        val actualHash: String? = null,
     ) : DownloadState
 }

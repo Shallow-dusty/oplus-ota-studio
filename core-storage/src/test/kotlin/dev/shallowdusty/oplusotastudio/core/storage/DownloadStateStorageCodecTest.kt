@@ -66,6 +66,32 @@ class DownloadStateStorageCodecTest {
     }
 
     @Test
+    fun `checksum mismatch failed state preserves structured hashes`() {
+        val columns = DownloadStateStorageCodec.toColumns(
+            DownloadState.Failed(
+                category = OtaErrorCategory.ChecksumMismatch,
+                retriesRemaining = 0,
+                raw = "quarantined at /cache/task.zip.bad",
+                expectedHash = "expected-md5",
+                actualHash = "actual-md5",
+            ),
+        )
+
+        assertEquals("expected-md5", columns.expectedHash)
+        assertEquals("actual-md5", columns.actualHash)
+        assertEquals(
+            DownloadState.Failed(
+                category = OtaErrorCategory.ChecksumMismatch,
+                retriesRemaining = 0,
+                raw = "quarantined at /cache/task.zip.bad",
+                expectedHash = "expected-md5",
+                actualHash = "actual-md5",
+            ),
+            DownloadStateStorageCodec.toDomain(columns),
+        )
+    }
+
+    @Test
     fun `unverified state round trips as terminal state`() {
         val columns = DownloadStateStorageCodec.toColumns(DownloadState.Unverified)
 

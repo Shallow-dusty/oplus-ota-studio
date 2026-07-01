@@ -25,6 +25,24 @@ interface HistoryDao {
     )
     suspend fun markDownloaded(packageName: String, downloadedAtMs: Long, localFilePath: String)
 
+    @Query(
+        """
+        UPDATE history
+        SET checksumExpectedHash = :expectedHash, checksumActualHash = :actualHash
+        WHERE id = (
+            SELECT id FROM history
+            WHERE packageName = :packageName
+            ORDER BY lookedUpAtMs DESC
+            LIMIT 1
+        )
+        """,
+    )
+    suspend fun markChecksumMismatch(
+        packageName: String,
+        expectedHash: String,
+        actualHash: String,
+    )
+
     @Query("SELECT * FROM history ORDER BY lookedUpAtMs DESC")
     fun observeAll(): Flow<List<HistoryEntity>>
 }

@@ -31,6 +31,8 @@ data class DownloadTaskEntity(
     val errorCategory: String?,
     val retriesRemaining: Int?,
     val rawError: String?,
+    val expectedHash: String?,
+    val actualHash: String?,
     val updatedAtMs: Long,
 ) {
     fun toDownloadState(): DownloadState =
@@ -49,6 +51,8 @@ data class DownloadTaskEntity(
             errorCategory = columns.errorCategory,
             retriesRemaining = columns.retriesRemaining,
             rawError = columns.rawError,
+            expectedHash = columns.expectedHash,
+            actualHash = columns.actualHash,
             updatedAtMs = updatedAtMs,
         )
     }
@@ -65,6 +69,8 @@ data class DownloadTaskEntity(
             errorCategory = errorCategory,
             retriesRemaining = retriesRemaining,
             rawError = rawError,
+            expectedHash = expectedHash,
+            actualHash = actualHash,
         )
 
     companion object {
@@ -100,6 +106,8 @@ data class DownloadTaskEntity(
                 errorCategory = columns.errorCategory,
                 retriesRemaining = columns.retriesRemaining,
                 rawError = columns.rawError,
+                expectedHash = columns.expectedHash,
+                actualHash = columns.actualHash,
                 updatedAtMs = updatedAtMs,
             )
         }

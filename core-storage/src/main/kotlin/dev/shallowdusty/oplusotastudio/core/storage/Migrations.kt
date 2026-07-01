@@ -50,3 +50,12 @@ val MIGRATION_2_3: Migration = object : Migration(2, 3) {
         db.execSQL("ALTER TABLE `history` ADD COLUMN `evidenceLevel` TEXT NOT NULL DEFAULT 'Synthetic'")
     }
 }
+
+val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `history` ADD COLUMN `checksumExpectedHash` TEXT")
+        db.execSQL("ALTER TABLE `history` ADD COLUMN `checksumActualHash` TEXT")
+        db.execSQL("ALTER TABLE `download_tasks` ADD COLUMN `expectedHash` TEXT")
+        db.execSQL("ALTER TABLE `download_tasks` ADD COLUMN `actualHash` TEXT")
+    }
+}

@@ -14,6 +14,8 @@ data class DownloadStateColumns(
     val errorCategory: String?,
     val retriesRemaining: Int?,
     val rawError: String?,
+    val expectedHash: String?,
+    val actualHash: String?,
 )
 
 object DownloadStateStorageCodec {
@@ -45,6 +47,8 @@ object DownloadStateStorageCodec {
                 errorCategory = state.category.name,
                 retriesRemaining = state.retriesRemaining,
                 rawError = state.raw,
+                expectedHash = state.expectedHash,
+                actualHash = state.actualHash,
             )
         }
 
@@ -75,6 +79,8 @@ object DownloadStateStorageCodec {
                 category = enumValueOrDefault(columns.errorCategory, OtaErrorCategory.Unknown),
                 retriesRemaining = columns.retriesRemaining ?: 0,
                 raw = columns.rawError,
+                expectedHash = columns.expectedHash,
+                actualHash = columns.actualHash,
             )
             else -> DownloadState.Failed(
                 category = OtaErrorCategory.Unknown,
@@ -94,6 +100,8 @@ object DownloadStateStorageCodec {
         errorCategory: String? = null,
         retriesRemaining: Int? = null,
         rawError: String? = null,
+        expectedHash: String? = null,
+        actualHash: String? = null,
     ): DownloadStateColumns =
         DownloadStateColumns(
             state = state,
@@ -106,6 +114,8 @@ object DownloadStateStorageCodec {
             errorCategory = errorCategory,
             retriesRemaining = retriesRemaining,
             rawError = rawError,
+            expectedHash = expectedHash,
+            actualHash = actualHash,
         )
 
     private inline fun <reified T : Enum<T>> enumValueOrDefault(raw: String?, default: T): T =

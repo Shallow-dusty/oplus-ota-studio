@@ -19,4 +19,6 @@ data class HistoryEntity(
     val lookedUpAtMs: Long,
     val downloadedAtMs: Long?,
     val localFilePath: String?,
+    val checksumExpectedHash: String?,
+    val checksumActualHash: String?,
 )

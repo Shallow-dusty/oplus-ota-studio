@@ -27,6 +27,18 @@ class RoomPackageRepository(
         )
     }
 
+    override suspend fun markChecksumMismatch(
+        packageName: String,
+        expectedHash: String,
+        actualHash: String,
+    ) {
+        historyDao.markChecksumMismatch(
+            packageName = packageName,
+            expectedHash = expectedHash,
+            actualHash = actualHash,
+        )
+    }
+
     override fun observeHistory(): Flow<List<HistoryEntry>> =
         historyDao.observeAll().map { rows ->
             rows.sortedByDescending { it.lookedUpAtMs }.map { it.toDomain() }
@@ -49,6 +61,8 @@ private fun HistoryEntry.toEntity(): HistoryEntity =
         lookedUpAtMs = lookedUpAtMs,
         downloadedAtMs = downloadedAtMs,
         localFilePath = localFilePath,
+        checksumExpectedHash = checksumExpectedHash,
+        checksumActualHash = checksumActualHash,
     )
 
 private fun HistoryEntity.toDomain(): HistoryEntry =
@@ -68,4 +82,6 @@ private fun HistoryEntity.toDomain(): HistoryEntry =
         lookedUpAtMs = lookedUpAtMs,
         downloadedAtMs = downloadedAtMs,
         localFilePath = localFilePath,
+        checksumExpectedHash = checksumExpectedHash,
+        checksumActualHash = checksumActualHash,
     )

@@ -35,6 +35,8 @@ class RoomPackageRepositoryTest {
                 lookedUpAtMs = 1000L,
                 downloadedAtMs = 2000L,
                 localFilePath = "/storage/emulated/0/Download/OPlus/package.zip",
+                checksumExpectedHash = "expected-md5",
+                checksumActualHash = "actual-md5",
             ),
             dao.upserts.single(),
         )
@@ -87,6 +89,35 @@ class RoomPackageRepositoryTest {
         )
     }
 
+    @Test
+    fun `markChecksumMismatch updates newest matching package row`() = runTest {
+        val dao = FakeHistoryDao()
+        val repository = RoomPackageRepository(dao)
+        dao.rows.value = listOf(
+            sampleEntity(id = "old", lookedUpAtMs = 1000L),
+            sampleEntity(id = "new", lookedUpAtMs = 2000L),
+            sampleEntity(id = "other", lookedUpAtMs = 3000L).copy(packageName = "LE2120_other"),
+        )
+
+        repository.markChecksumMismatch(
+            packageName = "LE2120_14.0.0.1901(CN01)",
+            expectedHash = "expected-md5",
+            actualHash = "actual-md5",
+        )
+
+        assertEquals(
+            listOf(
+                sampleEntity(id = "old", lookedUpAtMs = 1000L),
+                sampleEntity(id = "new", lookedUpAtMs = 2000L).copy(
+                    checksumExpectedHash = "expected-md5",
+                    checksumActualHash = "actual-md5",
+                ),
+                sampleEntity(id = "other", lookedUpAtMs = 3000L).copy(packageName = "LE2120_other"),
+            ),
+            dao.rows.value,
+        )
+    }
+
     private fun sampleEntry(id: String, lookedUpAtMs: Long): HistoryEntry =
         HistoryEntry(
             id = id,
@@ -103,6 +134,8 @@ class RoomPackageRepositoryTest {
             lookedUpAtMs = lookedUpAtMs,
             downloadedAtMs = 2000L,
             localFilePath = "/storage/emulated/0/Download/OPlus/package.zip",
+            checksumExpectedHash = "expected-md5",
+            checksumActualHash = "actual-md5",
         )
 
     private fun sampleEntity(id: String, lookedUpAtMs: Long): HistoryEntity =
@@ -121,6 +154,8 @@ class RoomPackageRepositoryTest {
             lookedUpAtMs = lookedUpAtMs,
             downloadedAtMs = null,
             localFilePath = null,
+            checksumExpectedHash = null,
+            checksumActualHash = null,
         )
 
     private class FakeHistoryDao : HistoryDao {
@@ -144,6 +179,26 @@ class RoomPackageRepositoryTest {
                     row.copy(
                         downloadedAtMs = downloadedAtMs,
                         localFilePath = localFilePath,
+                    )
+                } else {
+                    row
+                }
+            }
+        }
+
+        override suspend fun markChecksumMismatch(
+            packageName: String,
+            expectedHash: String,
+            actualHash: String,
+        ) {
+            val target = rows.value
+                .filter { it.packageName == packageName }
+                .maxByOrNull { it.lookedUpAtMs }
+            rows.value = rows.value.map { row ->
+                if (row.id == target?.id) {
+                    row.copy(
+                        checksumExpectedHash = expectedHash,
+                        checksumActualHash = actualHash,
                     )
                 } else {
                     row
