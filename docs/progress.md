@@ -190,5 +190,15 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 
 ## Next Recommended Work
 
-1. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
+Use
+[`docs/superpowers/plans/2026-07-01-v0.1-product-convergence.md`](superpowers/plans/2026-07-01-v0.1-product-convergence.md)
+as the active convergence plan.
+
+1. Stop expanding backend internals unless real-device or release validation
+   exposes a concrete blocking bug.
+2. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
+3. Add focused lookup/download UI state confidence tests before any screenshot
+   or visual-polish pass.
+4. Cut a private-trial release only with explicit known limitations; do not
+   claim public release readiness without real-device/live OTA evidence.
