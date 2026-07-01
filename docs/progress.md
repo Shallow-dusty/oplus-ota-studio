@@ -9,8 +9,8 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `3eec982 feat: localize download notification copy`
-- Working tree at the start of this documentation pass: clean
+- Latest implementation commit at this snapshot: `3a16144 docs: record API29 and API34 instrumentation evidence`
+- Working tree at the start of this continuation: API26 storage permission/test evidence changes in progress
 - Local connected-device check on 2026-07-01: `adb devices` reported no attached devices
 
 ## Current Product Status
@@ -22,7 +22,7 @@ yet.
 
 The remaining release blockers are mostly evidence and end-to-end validation:
 real device detection evidence, live/captured/replayed OTA lookup evidence,
-API 26 storage behavior, and release packaging polish.
+end-to-end download evidence, and release packaging polish.
 
 ## Implemented
 
@@ -74,6 +74,8 @@ API 26 storage behavior, and release packaging polish.
   direct download action that reuses the persisted package metadata.
 - Starting a package download from lookup now opens the downloads screen so the
   next visible step is queue/progress management.
+- Android 8/9 download actions request legacy shared-storage permission before
+  enqueueing package downloads.
 - Manual lookup profile editing now includes region selection and an advanced
   host override field backed by existing profile validation.
 - Lookup and download screens state that hash checks verify transfer integrity
@@ -86,7 +88,8 @@ API 26 storage behavior, and release packaging polish.
 
 - Final ZIP promotion targets `MediaStore.Downloads/OPlus OTA Studio` on Android
   10+.
-- An instrumentation test covers MediaStore promotion on API 29+ behavior.
+- Instrumentation tests cover MediaStore promotion on API 29+ behavior and
+  legacy public Downloads promotion on API 26 behavior.
 - Local API 30 emulator evidence on 2026-07-01:
   `connectedDebugAndroidTest` passed
   `AndroidMediaStoreDownloadFilePromoterInstrumentedTest.promotesZipIntoDownloadsCollectionOnScopedStorage`
@@ -96,6 +99,11 @@ API 26 storage behavior, and release packaging polish.
   `AndroidMediaStoreDownloadFilePromoterInstrumentedTest.promotesZipIntoDownloadsCollectionOnScopedStorage`
   on `OPlus_API29(AVD) - 10` and `OPlus_API34(AVD) - 14`; XML
   results are retained under `docs/evidence/instrumentation/`.
+- Local API 26 emulator evidence on 2026-07-01:
+  `:app:connectedDebugAndroidTest` passed
+  `AndroidMediaStoreDownloadFilePromoterInstrumentedTest.promotesZipIntoPublicDownloadsOnLegacyStorage`
+  on `OPlus_API26(AVD) - 8.0.0`; XML result is retained under
+  `docs/evidence/instrumentation/`.
 - CI includes unit/lint plus emulator instrumentation jobs for API 29 and API 34.
 - Manifest disables cleartext traffic and declares foreground data-sync service
   support.
@@ -114,8 +122,8 @@ API 26 storage behavior, and release packaging polish.
 - No real device is currently attached locally, so device detection and
   MediaStore flows have not been locally run on a physical OnePlus/OPlus device
   in this snapshot.
-- Local emulator validation now covers API 29, API 30, and API 34 storage
-  promotion behavior.
+- Local emulator validation now covers API 26, API 29, API 30, and API 34
+  storage promotion behavior.
 - No committed `captured-real-*` or `replayed-real-profile-*` successful OTA
   response fixture exists yet.
 - The ColorOS component parser is synthetic-schema coverage, not proof of a live
@@ -125,10 +133,7 @@ API 26 storage behavior, and release packaging polish.
 
 ### Download/Product Flow
 
-- Full ZIP end-to-end validation with a forced network drop still needs
-  device/emulator evidence.
-- API 26 storage behavior still needs a recorded local result or documented
-  emulator blocker before v0.1 can be called done.
+- Full ZIP end-to-end validation still needs device/emulator evidence.
 - Checksum mismatch expected/actual hashes are exposed in task failure details,
   but persisting them into structured history/debug records is now a hardening
   item, not the next product-flow blocker.
@@ -160,8 +165,8 @@ adb devices
 
 ## Next Recommended Work
 
-1. Record or document API 26 storage behavior.
-2. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
+1. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
+2. Run a minimal end-to-end download smoke using a controlled OTA fixture.
 3. Persist checksum mismatch expected/actual hash as structured history/debug
    metadata during release hardening.
