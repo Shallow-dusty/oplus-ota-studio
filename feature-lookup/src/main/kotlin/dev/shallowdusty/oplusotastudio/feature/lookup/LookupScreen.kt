@@ -108,20 +108,18 @@ private fun PrivacyDisclosureContent(
     onContinue: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val presentation = state.toPresentation()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(R.string.lookup_before_title), style = MaterialTheme.typography.headlineSmall)
-        Text(
-            stringResource(R.string.lookup_privacy_body),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        Text(presentation.label.asString(), style = MaterialTheme.typography.headlineSmall)
+        Text(presentation.details[0].asString(), style = MaterialTheme.typography.bodyMedium)
         SummaryRow(stringResource(R.string.lookup_label_model), state.profile.model)
         SummaryRow(stringResource(R.string.lookup_label_region), state.profile.region.name)
         SummaryRow(stringResource(R.string.lookup_label_ota_version), state.profile.otaVersion)
         Text(
-            stringResource(R.string.lookup_privacy_no_serial),
+            presentation.details[1].asString(),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -136,22 +134,24 @@ private fun PrivacyDisclosureContent(
 
 @Composable
 private fun DetectingContent() {
+    val presentation = LookupUiState.Detecting.toPresentation()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.lookup_detecting), style = MaterialTheme.typography.bodyMedium)
+            Text(presentation.label.asString(), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
 private fun QueryingContent() {
+    val presentation = LookupUiState.Querying.toPresentation()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.lookup_querying), style = MaterialTheme.typography.bodyMedium)
+            Text(presentation.label.asString(), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -163,6 +163,7 @@ private fun ReadyContent(
     onProfileChange: (OtaProfile) -> Unit,
 ) {
     val profile = state.profile
+    val presentation = state.toPresentation()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -171,7 +172,7 @@ private fun ReadyContent(
             DeviceSummary(state.device)
             HorizontalDivider()
         }
-        Text(stringResource(R.string.lookup_profile_title), style = MaterialTheme.typography.titleMedium)
+        Text(presentation.label.asString(), style = MaterialTheme.typography.titleMedium)
         OutlinedTextField(
             value = profile.model,
             onValueChange = { onProfileChange(profile.copy(model = it)) },
@@ -194,9 +195,16 @@ private fun ReadyContent(
             profile = profile,
             onProfileChange = onProfileChange,
         )
+        presentation.details.forEach { detail ->
+            Text(
+                detail.asString(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         Button(
             onClick = onLookup,
-            enabled = profile.isLookupReady,
+            enabled = presentation.canLookup,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(Icons.Filled.Search, contentDescription = null)
@@ -308,30 +316,30 @@ private fun PackageFoundContent(
 ) {
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
+    val presentation = LookupUiState.PackageFound(pkg, liveLookupExperimental).toPresentation()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(stringResource(R.string.lookup_update_available), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        Text(presentation.label.asString(), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
         SummaryRow(stringResource(R.string.lookup_label_version), pkg.versionName)
         SummaryRow(stringResource(R.string.lookup_label_type), pkg.type)
         SummaryRow(stringResource(R.string.lookup_label_size), formatBytes(pkg.sizeBytes))
         SummaryRow(stringResource(R.string.lookup_label_source), pkg.sourceHost)
         SummaryRow(stringResource(R.string.lookup_label_evidence), pkg.evidenceLevel.stableId)
-        if (liveLookupExperimental) {
+        presentation.details.forEach { detail ->
             Text(
-                stringResource(R.string.lookup_experimental_notice),
+                detail.asString(),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                color = if (detail.resId == R.string.lookup_experimental_notice) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
         }
         SummaryRow(stringResource(R.string.lookup_label_md5), pkg.md5)
         SummaryRow(stringResource(R.string.lookup_label_sha256), pkg.sha256)
-        Text(
-            stringResource(R.string.lookup_verification_scope),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         val notes = pkg.releaseNotes
         if (notes != null) {
             Spacer(Modifier.height(8.dp))
@@ -369,27 +377,29 @@ private fun PackageFoundContent(
 
 @Composable
 private fun NoUpdateContent(onReset: () -> Unit) {
+    val presentation = LookupUiState.NoUpdate.toPresentation()
     Column(
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(R.string.lookup_up_to_date), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-        Text(stringResource(R.string.lookup_no_update), style = MaterialTheme.typography.bodyMedium)
+        Text(presentation.label.asString(), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        Text(presentation.details.single().asString(), style = MaterialTheme.typography.bodyMedium)
         OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lookup_back_to_lookup)) }
     }
 }
 
 @Composable
 private fun ErrorContent(state: LookupUiState.Error, onReset: () -> Unit) {
+    val presentation = state.toPresentation()
     Column(
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(R.string.lookup_failed), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error)
-        Text(categoryLabel(state.category), style = MaterialTheme.typography.bodyMedium)
-        if (state.raw != null) {
+        Text(presentation.label.asString(), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error)
+        Text(presentation.details.single().asString(), style = MaterialTheme.typography.bodyMedium)
+        if (presentation.rawDetails != null) {
             Text(
-                state.raw,
+                presentation.rawDetails,
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -400,14 +410,9 @@ private fun ErrorContent(state: LookupUiState.Error, onReset: () -> Unit) {
 }
 
 @Composable
-private fun categoryLabel(c: dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory): String = when (c) {
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Network -> stringResource(R.string.lookup_error_network)
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Server -> stringResource(R.string.lookup_error_server)
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Malformed -> stringResource(R.string.lookup_error_malformed)
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Device -> stringResource(R.string.lookup_error_device)
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.File -> stringResource(R.string.lookup_error_file)
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.ChecksumMismatch -> stringResource(R.string.lookup_error_checksum)
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Unknown -> stringResource(R.string.lookup_error_unknown)
+private fun LookupStateText.asString(): String {
+    val formattedArgs = args.map { arg -> arg ?: "—" }.toTypedArray()
+    return stringResource(resId, *formattedArgs)
 }
 
 private fun formatBytes(bytes: Long): String {
