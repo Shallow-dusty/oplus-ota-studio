@@ -1,0 +1,140 @@
+OPlus OTA Studio release smoke after UI state presentation coverage
+Date: 2026-07-01
+Local time: 2026-07-01 23:07 +08:00
+Branch: feat/backend-core
+Source commit before this evidence doc: 6049762
+
+Purpose
+-------
+Refresh release evidence after lookup/download state presentation changes.
+This is private-trial packaging evidence only. It is not real-device OTA
+lookup evidence and does not prove public release readiness.
+
+Device availability
+-------------------
+Command:
+  adb devices
+
+Result before emulator startup:
+  List of devices attached
+
+No physical device was attached.
+
+Unsigned release build
+----------------------
+Command:
+  .\gradlew.bat :app:assembleRelease
+
+Result:
+  BUILD SUCCESSFUL
+  :app:minifyReleaseWithR8 executed
+  :app:assembleRelease completed
+
+Unsigned artifact:
+  app/build/outputs/apk/release/app-release-unsigned.apk
+  size: 2,266,030 bytes
+
+Release metadata:
+  applicationId: dev.shallowdusty.oplusotastudio
+  versionCode: 10
+  versionName: 0.1.0
+  outputFile: app-release-unsigned.apk
+
+R8 outputs:
+  app/build/outputs/mapping/release/mapping.txt
+  size: 37,430,988 bytes
+
+Temporary signed release build
+------------------------------
+Temporary throwaway keystore:
+  build/tmp/release-smoke-20260701-230507/oplus-ota-studio-smoke.jks
+
+Command:
+  .\gradlew.bat :app:assembleRelease `
+    -PoplusOtaStudio.releaseStoreFile=<temporary smoke keystore> `
+    -PoplusOtaStudio.releaseStorePassword=<temporary smoke password> `
+    -PoplusOtaStudio.releaseKeyAlias=oplus-smoke `
+    -PoplusOtaStudio.releaseKeyPassword=<temporary smoke password>
+
+Result:
+  BUILD SUCCESSFUL
+  :app:packageRelease completed
+  :app:assembleRelease completed
+
+Signed artifact:
+  app/build/outputs/apk/release/app-release.apk
+  size: 2,278,318 bytes
+
+Release metadata:
+  applicationId: dev.shallowdusty.oplusotastudio
+  versionCode: 10
+  versionName: 0.1.0
+  outputFile: app-release.apk
+
+Signature verification
+----------------------
+Command:
+  & "$env:ANDROID_HOME\build-tools\37.0.0\apksigner.bat" verify --print-certs `
+    app\build\outputs\apk\release\app-release.apk
+
+Result:
+  V2 Signer: certificate DN: CN=OPlus OTA Studio Smoke, O=Shallow Dusty, C=US
+  V2 Signer SHA-256:
+    6f18ae7cffc26add9784d7332ac2765c3561c4001edc174136fd15c694474001
+
+API 34 install and launch smoke
+-------------------------------
+AVD:
+  OPlus_API34
+
+Boot check:
+  adb shell getprop sys.boot_completed -> 1
+  adb shell getprop ro.build.version.release -> 14
+  adb shell getprop ro.build.version.sdk -> 34
+
+The first install attempt used "-r" and failed because an older smoke build
+with a different temporary signature was already installed:
+  INSTALL_FAILED_UPDATE_INCOMPATIBLE
+
+The old package was removed before installing this APK:
+  adb uninstall dev.shallowdusty.oplusotastudio -> Success
+  adb install app\build\outputs\apk\release\app-release.apk -> Success
+
+Launch:
+  adb shell monkey -p dev.shallowdusty.oplusotastudio `
+    -c android.intent.category.LAUNCHER 1
+
+Result:
+  Events injected: 1
+  topResumedActivity=
+    ActivityRecord{... dev.shallowdusty.oplusotastudio/.MainActivity ...}
+
+Installed package state:
+  packageName: dev.shallowdusty.oplusotastudio
+  versionCode: 10
+  versionName: 0.1.0
+  minSdk: 26
+  targetSdk: 36
+
+Crash scan:
+  adb logcat -d -t 800 |
+    Select-String -Pattern
+      'FATAL EXCEPTION|Process: dev.shallowdusty.oplusotastudio|AndroidRuntime: FATAL'
+
+Result:
+  no matches
+
+Gate
+----
+Command:
+  .\gradlew.bat test lintDebug :app:compileDebugAndroidTestKotlin
+
+Result:
+  BUILD SUCCESSFUL
+
+Known limits
+------------
+- No physical OnePlus/OPlus device was attached during this pass.
+- This smoke does not prove live OTA endpoint behavior.
+- The temporary signing key is for local smoke only and is not durable private
+  trial signing material.

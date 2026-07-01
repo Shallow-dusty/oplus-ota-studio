@@ -59,3 +59,19 @@ Local smoke evidence on 2026-07-01:
 - `apksigner verify --print-certs` reported a V2 signer for the temporary
   signed APK.
 - `output-metadata.json` reported `versionCode` `10` and `versionName` `0.1.0`.
+
+Current-code release smoke after UI state presentation coverage on 2026-07-01:
+
+- `:app:assembleRelease` passed without signing values and ran
+  `:app:minifyReleaseWithR8`.
+- `:app:assembleRelease` passed with a temporary throwaway keystore under
+  `build/tmp/`.
+- `apksigner verify --print-certs` reported a V2 signer for
+  `app-release.apk`.
+- `app-release.apk` installed on `OPlus_API34` after removing an older
+  differently signed smoke build, and `.MainActivity` launched as the top
+  resumed activity.
+- A targeted logcat scan found no `FATAL EXCEPTION` or app-process
+  `AndroidRuntime` crash.
+- Detailed evidence:
+  `docs/evidence/release/r8-release-api34-smoke-2026-07-01-ui-state-refresh.txt`.

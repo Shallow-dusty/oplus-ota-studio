@@ -169,6 +169,12 @@ evidence and live/captured/replayed OTA lookup evidence.
   temporary-signed R8 APK and launched `.MainActivity` without a detected
   `AndroidRuntime`/fatal crash; details are retained under
   `docs/evidence/release/`.
+- Current-code release evidence after lookup/download state presentation
+  coverage on 2026-07-01 built unsigned and temporary-signed release APKs,
+  verified the V2 signer, installed the APK on `OPlus_API34` after removing an
+  older differently signed smoke build, launched `.MainActivity`, and found no
+  app-process fatal crash in a targeted logcat scan. Details:
+  `docs/evidence/release/r8-release-api34-smoke-2026-07-01-ui-state-refresh.txt`.
 - Durable private signing material is intentionally not committed; use
   `docs/release.md` for the local signing workflow.
 - The repository should stay private until v0.3 release-candidate readiness.
