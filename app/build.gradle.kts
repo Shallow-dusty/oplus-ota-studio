@@ -61,8 +61,11 @@ android {
             isMinifyEnabled = false
         }
         release {
-            // R8/minification is enabled in the v0.3 release-candidate polish.
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             if (hasCompleteReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
