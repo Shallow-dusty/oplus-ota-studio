@@ -2,8 +2,11 @@ package dev.shallowdusty.oplusotastudio.core.ota
 
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
+import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
+import java.net.URI
+import org.json.JSONObject
 
 data class JsonOtaRequest(
     val host: String,
@@ -56,6 +59,40 @@ class JsonOtaProtocol(
         )
     }
 
+    fun parseDecryptedComponentPayload(rawJson: String, sourceHost: String): OtaLookupResult =
+        runCatching {
+            val root = JSONObject(rawJson)
+            val components = root.optJSONArray("components")
+                ?: return OtaLookupResult.Error(OtaErrorCategory.Malformed, rawJson)
+            if (components.length() == 0) return OtaLookupResult.NoUpdate
+
+            val component = components.getJSONObject(0)
+            val packets = component.getJSONObject("componentPackets")
+            val versionName = root.optString("versionName").takeIf { it.isNotBlank() }
+                ?: return OtaLookupResult.Error(OtaErrorCategory.Malformed, rawJson)
+            val size = packets.optString("size").toLongOrNull()
+                ?: return OtaLookupResult.Error(OtaErrorCategory.Malformed, rawJson)
+            val url = packets.optString("url").takeIf { it.isNotBlank() }
+                ?: packets.optString("manualUrl").takeIf { it.isNotBlank() }
+                ?: return OtaLookupResult.Error(OtaErrorCategory.Malformed, rawJson)
+            if (!url.isHttpsUrl()) return OtaLookupResult.Error(OtaErrorCategory.Malformed, rawJson)
+
+            OtaLookupResult.PackageFound(
+                OtaPackage(
+                    versionName = versionName,
+                    type = component.optString("componentName").takeIf { it.isNotBlank() },
+                    sizeBytes = size,
+                    sourceHost = sourceHost,
+                    downloadUrl = url,
+                    md5 = packets.optString("md5").takeIf { it.isNotBlank() },
+                    sha256 = null,
+                    releaseNotes = root.optString("releaseNotes").takeIf { it.isNotBlank() },
+                ),
+            )
+        }.getOrElse {
+            OtaLookupResult.Error(OtaErrorCategory.Malformed, rawJson)
+        }
+
     private companion object {
         const val DisabledPath = "/ota/json/disabled-unverified"
     }
@@ -84,3 +121,9 @@ private fun String.escapeJson(): String =
             }
         }
     }
+
+private fun String.isHttpsUrl(): Boolean =
+    runCatching {
+        val uri = URI(this)
+        uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()
+    }.getOrDefault(false)

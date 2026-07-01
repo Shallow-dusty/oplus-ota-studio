@@ -1,0 +1,33 @@
+{
+  "versionName": "LE2120_14.0.0.720(CN01)",
+  "realAndroidVersion": "14",
+  "realOsVersion": "14.0",
+  "osVersion": "ColorOS 14",
+  "colorOSVersion": "ColorOS14",
+  "versionTypeId": "stable",
+  "releaseNotes": "OnePlus 9 Pro ColorOS H.21",
+  "components": [
+    {
+      "componentId": "ota",
+      "componentName": "full",
+      "componentVersion": "H.21",
+      "componentPackets": {
+        "size": "6559817109",
+        "manualUrl": "https://componentota-manual-cn.allawnfs.com/component-ota/24/10/16/362c202b68dc4953bb968750e196c50e.zip",
+        "url": "https://gauss-compotacostauto-cn.allawnfs.com/redacted/component-ota/24/10/16/362c202b68dc4953bb968750e196c50e.zip",
+        "md5": "362c202b68dc4953bb968750e196c50e",
+        "vabInfo": {
+          "data": {
+            "header": [
+              "FILE_HASH=362c202b68dc4953bb968750e196c50e",
+              "FILE_SIZE=6559817109",
+              "android_version=14",
+              "oplus_rom_version=H.21",
+              "security_patch=2024-10-05"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
