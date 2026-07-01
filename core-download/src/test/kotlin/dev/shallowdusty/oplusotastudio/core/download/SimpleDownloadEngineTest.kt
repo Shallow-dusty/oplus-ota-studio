@@ -254,6 +254,37 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `emits download speed with progress updates`() = runTest {
+        val body = "a".repeat(1024 * 1024) + "b"
+        server.enqueue(MockResponse(code = 200, body = body))
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("progress-speed"),
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = "b67a5f55dade2839f62150d7353fdf03",
+            ),
+        )
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Verified }
+        }
+
+        val speeds = store.updates
+            .map { it.state }
+            .filterIsInstance<DownloadState.Running>()
+            .mapNotNull { it.speedBytesPerSec }
+        assertTrue(speeds.any { it > 0L })
+    }
+
+    @Test
     fun `persists resume metadata from response headers`() = runTest {
         server.enqueue(
             MockResponse(

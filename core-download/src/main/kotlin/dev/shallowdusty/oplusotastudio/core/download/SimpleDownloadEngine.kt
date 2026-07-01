@@ -321,7 +321,18 @@ class SimpleDownloadEngine(
                                     lastProgressUpdateAtMs = lastProgressUpdateAtMs,
                                 )
                             ) {
-                                updateState(DownloadState.Running(downloaded, targetSize, null))
+                                updateState(
+                                    DownloadState.Running(
+                                        downloadedBytes = downloaded,
+                                        targetSize = targetSize,
+                                        speedBytesPerSec = estimateSpeedBytesPerSec(
+                                            downloadedBytes = downloaded,
+                                            lastProgressUpdateBytes = lastProgressUpdateBytes,
+                                            nowMs = nowMs,
+                                            lastProgressUpdateAtMs = lastProgressUpdateAtMs,
+                                        ),
+                                    ),
+                                )
                                 lastProgressUpdateBytes = downloaded
                                 lastProgressUpdateAtMs = nowMs
                             }
@@ -390,6 +401,18 @@ class SimpleDownloadEngine(
         ): Boolean =
             downloadedBytes - lastProgressUpdateBytes >= ProgressUpdateMinBytes ||
                 nowMs - lastProgressUpdateAtMs >= ProgressUpdateMinIntervalMs
+
+        private fun estimateSpeedBytesPerSec(
+            downloadedBytes: Long,
+            lastProgressUpdateBytes: Long,
+            nowMs: Long,
+            lastProgressUpdateAtMs: Long,
+        ): Long {
+            val deltaBytes = downloadedBytes - lastProgressUpdateBytes
+            if (deltaBytes <= 0L) return 0L
+            val elapsedMs = (nowMs - lastProgressUpdateAtMs).coerceAtLeast(1L)
+            return (deltaBytes * 1000L / elapsedMs).coerceAtLeast(1L)
+        }
 
         private suspend fun retryOrFinish(
             outcome: DownloadAttemptOutcome.Failed,
