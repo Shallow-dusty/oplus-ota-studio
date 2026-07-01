@@ -14,7 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,7 +33,10 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
@@ -42,6 +48,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
+import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
+import dev.shallowdusty.oplusotastudio.core.model.isLookupReady
 import kotlinx.coroutines.launch
 
 /**
@@ -147,7 +156,7 @@ private fun QueryingContent() {
 private fun ReadyContent(
     state: LookupUiState.Ready,
     onLookup: () -> Unit,
-    onProfileChange: (dev.shallowdusty.oplusotastudio.core.model.OtaProfile) -> Unit,
+    onProfileChange: (OtaProfile) -> Unit,
 ) {
     val profile = state.profile
     Column(
@@ -173,14 +182,82 @@ private fun ReadyContent(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        RegionSelector(
+            region = profile.region,
+            onRegionChange = { onProfileChange(profile.copy(region = it)) },
+        )
+        AdvancedHostOverride(
+            profile = profile,
+            onProfileChange = onProfileChange,
+        )
         Button(
             onClick = onLookup,
-            enabled = profile.otaVersion.isNotBlank(),
+            enabled = profile.isLookupReady,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(Icons.Filled.Search, contentDescription = null)
             Spacer(Modifier.size(8.dp))
             Text("Look up update")
+        }
+    }
+}
+
+@Composable
+private fun RegionSelector(
+    region: OtaRegion,
+    onRegionChange: (OtaRegion) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Region", style = MaterialTheme.typography.titleSmall)
+        Box {
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(region.name)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                OtaRegion.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.name) },
+                        onClick = {
+                            expanded = false
+                            onRegionChange(option)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdvancedHostOverride(
+    profile: OtaProfile,
+    onProfileChange: (OtaProfile) -> Unit,
+) {
+    var expanded by remember(profile.hostOverride) {
+        mutableStateOf(!profile.hostOverride.isNullOrBlank())
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+                checked = expanded,
+                onCheckedChange = { checked ->
+                    expanded = checked
+                    if (!checked) {
+                        onProfileChange(profile.copy(hostOverride = null))
+                    }
+                },
+            )
+            Text("Advanced host override", style = MaterialTheme.typography.bodyMedium)
+        }
+        if (expanded) {
+            OutlinedTextField(
+                value = profile.hostOverride.orEmpty(),
+                onValueChange = { onProfileChange(profile.copy(hostOverride = it)) },
+                label = { Text("OTA host") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
