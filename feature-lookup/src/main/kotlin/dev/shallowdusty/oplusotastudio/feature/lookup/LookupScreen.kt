@@ -1,5 +1,6 @@
 package dev.shallowdusty.oplusotastudio.feature.lookup
 
+import android.content.ClipData
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,11 +25,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 
 /**
  * The lookup screen (spec §5, §6). Renders every [LookupUiState] branch
@@ -214,6 +220,8 @@ private fun PackageFoundContent(
     onDownload: (dev.shallowdusty.oplusotastudio.core.model.OtaPackage) -> Unit,
     onReset: () -> Unit,
 ) {
+    val clipboard = LocalClipboard.current
+    val coroutineScope = rememberCoroutineScope()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -242,6 +250,22 @@ private fun PackageFoundContent(
         Spacer(Modifier.height(16.dp))
         Button(onClick = { onDownload(pkg) }, modifier = Modifier.fillMaxWidth()) {
             Text("Download package")
+        }
+        OutlinedButton(
+            onClick = {
+                coroutineScope.launch {
+                    clipboard.setClipEntry(
+                        ClipEntry(
+                            ClipData.newPlainText("OTA package link", pkg.downloadUrl),
+                        ),
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Filled.ContentCopy, contentDescription = null)
+            Spacer(Modifier.size(8.dp))
+            Text("Copy link")
         }
         OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
             Text("Back to lookup")
