@@ -81,6 +81,9 @@ evidence and live/captured/replayed OTA lookup evidence.
   checksum mismatch diagnostics.
 - Downloads now surfaces lookup history, copy-link/copy-path actions, and a
   direct download action that reuses the persisted package metadata.
+- Download state presentation now has focused JVM coverage for queued, running,
+  paused, retrying, verifying, verified, unverified, canceled, failed, and
+  checksum-mismatch hash detail rendering.
 - Starting a package download from lookup now opens the downloads screen so the
   next visible step is queue/progress management.
 - Android 8/9 download actions request legacy shared-storage permission before
@@ -149,7 +152,9 @@ evidence and live/captured/replayed OTA lookup evidence.
 
 ### Release Readiness
 
-- UI tests/screenshot tests for every lookup/download state are not complete.
+- Lookup state presentation tests and screenshot tests are not complete.
+- Download state presentation has focused JVM coverage, but screenshot tests are
+  still not complete.
 - Debug and release APK assembly passed locally on 2026-07-01.
 - Private-trial versioning is configured as `versionCode` `10` and
   `versionName` `0.1.0`.
