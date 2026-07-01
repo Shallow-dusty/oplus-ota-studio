@@ -9,7 +9,7 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `2d6d54a feat: open downloads after queuing package`
+- Latest implementation commit at this snapshot: `f6031f9 feat: edit lookup region and host override`
 - Working tree at the start of this documentation pass: clean
 - Local connected-device check on 2026-07-01: `adb devices` reported no attached devices
 
@@ -75,6 +75,8 @@ release-copy limitations, and release packaging polish.
   direct download action that reuses the persisted package metadata.
 - Starting a package download from lookup now opens the downloads screen so the
   next visible step is queue/progress management.
+- Manual lookup profile editing now includes region selection and an advanced
+  host override field backed by existing profile validation.
 - DataStore backs download preferences and lookup privacy consent.
 
 ### Files And Platform Integration
@@ -109,8 +111,6 @@ release-copy limitations, and release packaging polish.
 
 ### Lookup/Product Flow
 
-- The app has a manual model/build profile edit path, but advanced progressive
-  disclosure for region/host override is not complete.
 - Release copy/details must still consistently state that v1 verifies transfer
   integrity only, not OPlus package signatures.
 
@@ -153,11 +153,10 @@ adb devices
 
 ## Next Recommended Work
 
-1. Expose advanced region/host override behind progressive disclosure.
-2. Run connected instrumentation on API 29 and API 34, and record or document
+1. Run connected instrumentation on API 29 and API 34, and record or document
    API 26 behavior.
-3. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
+2. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
-4. Move user-facing strings into `en` and `zh-rCN` resources.
-5. Persist checksum mismatch expected/actual hash as structured history/debug
+3. Move user-facing strings into `en` and `zh-rCN` resources.
+4. Persist checksum mismatch expected/actual hash as structured history/debug
    metadata during release hardening.
