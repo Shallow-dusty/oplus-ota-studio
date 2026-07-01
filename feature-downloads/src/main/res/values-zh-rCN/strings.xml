@@ -25,4 +25,6 @@
     <string name="downloads_unverified_body">服务器未提供 checksum。传输完整性未知，且本应用不验证 OPlus 包签名。</string>
     <string name="downloads_state_failed">失败 - %1$s</string>
     <string name="downloads_retries_remaining">剩余 %1$d 次重试</string>
+    <string name="downloads_expected_hash">预期哈希：%1$s</string>
+    <string name="downloads_actual_hash">实际哈希：%1$s</string>
 </resources>

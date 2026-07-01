@@ -25,4 +25,6 @@
     <string name="downloads_unverified_body">No checksum was provided. Transfer integrity is unknown, and OPlus package signatures are not verified by this app.</string>
     <string name="downloads_state_failed">Failed - %1$s</string>
     <string name="downloads_retries_remaining">%1$d retries remaining</string>
+    <string name="downloads_expected_hash">Expected hash: %1$s</string>
+    <string name="downloads_actual_hash">Actual hash: %1$s</string>
 </resources>

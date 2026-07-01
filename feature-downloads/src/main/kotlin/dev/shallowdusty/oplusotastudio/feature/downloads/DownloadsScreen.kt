@@ -117,6 +117,7 @@ private fun DownloadRowCard(
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
 ) {
+    val presentation = row.state.toPresentation()
     Column(Modifier.fillMaxWidth()) {
         Text(
             text = row.taskId.takeLast(8),
@@ -125,7 +126,7 @@ private fun DownloadRowCard(
         )
         Spacer(Modifier.height(4.dp))
         when (val s = row.state) {
-            DownloadState.Queued -> StateLabel(stringResource(R.string.downloads_state_queued))
+            DownloadState.Queued -> StateLabel(presentation.label.asString())
             is DownloadState.Running -> RunningContent(
                 state = s,
                 taskId = row.taskId,
@@ -142,7 +143,7 @@ private fun DownloadRowCard(
             DownloadState.Verifying -> VerifyingContent()
             DownloadState.Verified -> VerifiedContent()
             DownloadState.Unverified -> UnverifiedContent()
-            DownloadState.Canceled -> StateLabel(stringResource(R.string.downloads_state_canceled), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            DownloadState.Canceled -> StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             is DownloadState.Failed -> FailedContent(s)
         }
     }
@@ -218,12 +219,9 @@ private fun HistoryRowCard(
 
 @Composable
 private fun VerifiedContent() {
-    StateLabel(stringResource(R.string.downloads_transfer_verified), color = MaterialTheme.colorScheme.primary)
-    Text(
-        stringResource(R.string.downloads_transfer_verified_body),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    val presentation = DownloadState.Verified.toPresentation()
+    StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.primary)
+    DetailTexts(presentation)
 }
 
 @Composable
@@ -238,23 +236,20 @@ private fun RunningContent(
     onPause: (String) -> Unit,
     onCancel: (String) -> Unit,
 ) {
-    val target = state.targetSize
-    val progress = if (target != null && target > 0) {
-        (state.downloadedBytes.toFloat() / target).coerceIn(0f, 1f)
-    } else null
-    if (progress != null) {
-        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+    val presentation = state.toPresentation()
+    if (presentation.progressFraction != null) {
+        LinearProgressIndicator(progress = { presentation.progressFraction }, modifier = Modifier.fillMaxWidth())
     } else {
         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
     }
     Spacer(Modifier.height(4.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(
-            stringResource(R.string.downloads_progress, formatBytes(state.downloadedBytes), target?.let(::formatBytes) ?: "?"),
+            presentation.label.asString(),
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
-            state.speedBytesPerSec?.let { stringResource(R.string.downloads_speed, formatBytes(it)) } ?: "—",
+            presentation.speedBytesPerSec?.let { stringResource(R.string.downloads_speed, formatBytes(it)) } ?: "—",
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -271,7 +266,8 @@ private fun PausedContent(
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
 ) {
-    StateLabel(stringResource(R.string.downloads_state_paused, state.reason.name.lowercase()), color = MaterialTheme.colorScheme.tertiary)
+    val presentation = state.toPresentation()
+    StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.tertiary)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { onResume(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_resume)) }
         TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_cancel)) }
@@ -280,8 +276,9 @@ private fun PausedContent(
 
 @Composable
 private fun RetryingContent(state: DownloadState.Retrying) {
+    val presentation = state.toPresentation()
     StateLabel(
-        stringResource(R.string.downloads_state_retrying, state.attempt, state.maxAttempts, state.category.name.lowercase()),
+        presentation.label.asString(),
         color = MaterialTheme.colorScheme.tertiary,
     )
     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -289,31 +286,51 @@ private fun RetryingContent(state: DownloadState.Retrying) {
 
 @Composable
 private fun VerifyingContent() {
+    val presentation = DownloadState.Verifying.toPresentation()
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         CircularProgressIndicator(modifier = Modifier.height(16.dp))
-        Text(stringResource(R.string.downloads_verifying), style = MaterialTheme.typography.bodyMedium)
+        Text(presentation.label.asString(), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
 private fun UnverifiedContent() {
-    StateLabel(stringResource(R.string.downloads_unverified), color = MaterialTheme.colorScheme.tertiary)
-    Text(
-        stringResource(R.string.downloads_unverified_body),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    val presentation = DownloadState.Unverified.toPresentation()
+    StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.tertiary)
+    DetailTexts(presentation)
 }
 
 @Composable
 private fun FailedContent(state: DownloadState.Failed) {
-    StateLabel(stringResource(R.string.downloads_state_failed, state.category.name.lowercase()), color = MaterialTheme.colorScheme.error)
-    if (state.retriesRemaining > 0) {
-        Text(stringResource(R.string.downloads_retries_remaining, state.retriesRemaining), style = MaterialTheme.typography.bodySmall)
-    }
-    state.raw?.let {
+    val presentation = state.toPresentation()
+    StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.error)
+    DetailTexts(presentation)
+    presentation.rawDetails?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+@Composable
+private fun DetailTexts(presentation: DownloadStatePresentation) {
+    presentation.details.forEach { detail ->
+        Text(
+            detail.asString(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun DownloadStateText.asString(): String {
+    val formattedArgs = args.map { arg ->
+        when (arg) {
+            is Long -> formatBytes(arg)
+            null -> "?"
+            else -> arg
+        }
+    }.toTypedArray()
+    return stringResource(resId, *formattedArgs)
 }
 
 private fun formatBytes(bytes: Long): String {
