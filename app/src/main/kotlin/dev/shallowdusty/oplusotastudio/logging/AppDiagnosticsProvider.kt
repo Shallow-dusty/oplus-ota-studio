@@ -12,10 +12,12 @@ class AppDiagnosticsProvider(
     fun exportLogs(
         targetZip: File,
         recentLineLimit: Int = DefaultRecentLineLimit,
+        taskErrorChain: List<String> = emptyList(),
     ): File =
         logArchiveExporter.exportTo(
             targetZip = targetZip,
             recentLineLimit = recentLineLimit,
+            taskErrorChain = taskErrorChain,
         )
 
     private companion object {

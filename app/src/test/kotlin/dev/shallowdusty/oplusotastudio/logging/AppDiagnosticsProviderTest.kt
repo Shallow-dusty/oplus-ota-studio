@@ -52,6 +52,28 @@ class AppDiagnosticsProviderTest {
     }
 
     @Test
+    fun `exports current task error chain with redaction`() {
+        val provider = AppDiagnosticsProvider(
+            logStore = logStore,
+            logArchiveExporter = AppLogArchiveExporter(logStore = logStore, nowMs = { 25L }),
+        )
+
+        val zipFile = provider.exportLogs(
+            targetZip = root.resolve("diagnostics/errors.zip"),
+            taskErrorChain = listOf(
+                "Download failed",
+                "HTTP 503 signedUrl=https://example.invalid/token.zip imei=490154203237518",
+            ),
+        )
+
+        val taskErrors = zipEntries(zipFile).getValue("diagnostics/current-task-errors.txt")
+        assertTrue(taskErrors.contains("Download failed"))
+        assertTrue(taskErrors.contains("imei=[REDACTED_IMEI]"))
+        assertTrue(taskErrors.contains("signedUrl=[REDACTED_URL]"))
+        assertTrue(!taskErrors.contains("490154203237518"))
+    }
+
+    @Test
     fun `factory uses files dir rolling log store`() {
         val logger = createAppLogger(filesDir = root, debuggable = false)
         logger.info("Download", "queued")

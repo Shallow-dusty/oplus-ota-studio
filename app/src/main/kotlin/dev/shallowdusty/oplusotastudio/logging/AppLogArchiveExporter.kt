@@ -12,6 +12,7 @@ class AppLogArchiveExporter(
     fun exportTo(
         targetZip: File,
         recentLineLimit: Int = DefaultRecentLineLimit,
+        taskErrorChain: List<String> = emptyList(),
     ): File {
         targetZip.parentFile?.mkdirs()
         ZipOutputStream(targetZip.outputStream()).use { zip ->
@@ -24,6 +25,14 @@ class AppLogArchiveExporter(
                 text = logStore.readRecentLines(recentLineLimit)
                     .joinToString(separator = "\n", postfix = "\n") { line -> redactor(line) },
             )
+            if (taskErrorChain.isNotEmpty()) {
+                zip.writeEntry(
+                    name = "diagnostics/current-task-errors.txt",
+                    text = taskErrorChain.joinToString(separator = "\n", postfix = "\n") { line ->
+                        redactor(line)
+                    },
+                )
+            }
         }
         return targetZip
     }
