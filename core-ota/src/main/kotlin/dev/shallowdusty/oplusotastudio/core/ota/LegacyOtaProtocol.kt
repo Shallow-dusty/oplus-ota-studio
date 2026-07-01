@@ -89,13 +89,22 @@ class LegacyOtaProtocol(
         DocumentBuilderFactory.newInstance().apply {
             isIgnoringComments = true
             isCoalescing = true
-            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-            setFeature("http://xml.org/sax/features/external-general-entities", false)
-            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-            isXIncludeAware = false
-            isExpandEntityReferences = false
+            setFeatureIfSupported("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeatureIfSupported("http://xml.org/sax/features/external-general-entities", false)
+            setFeatureIfSupported("http://xml.org/sax/features/external-parameter-entities", false)
+            setFeatureIfSupported("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            runCatching { isXIncludeAware = false }
+            runCatching { isExpandEntityReferences = false }
         }
+}
+
+private fun DocumentBuilderFactory.setFeatureIfSupported(
+    name: String,
+    value: Boolean,
+) {
+    runCatching {
+        setFeature(name, value)
+    }
 }
 
 private fun org.w3c.dom.Document.text(tagName: String): String? {
