@@ -1,0 +1,28 @@
+<resources>
+    <string name="downloads_title">Downloads</string>
+    <string name="downloads_empty">No downloads yet.</string>
+    <string name="downloads_active_section">Active downloads</string>
+    <string name="downloads_history_section">Package history</string>
+    <string name="downloads_state_queued">Queued</string>
+    <string name="downloads_state_canceled">Canceled</string>
+    <string name="downloads_history_meta">%1$s · %2$s · %3$s</string>
+    <string name="downloads_download">Download</string>
+    <string name="downloads_clipboard_package_link">OTA package link</string>
+    <string name="downloads_copy_link">Copy link</string>
+    <string name="downloads_clipboard_downloaded_path">Downloaded OTA path</string>
+    <string name="downloads_copy_path">Copy path</string>
+    <string name="downloads_transfer_verified">Transfer verified</string>
+    <string name="downloads_transfer_verified_body">Hash verification confirms download transfer integrity, not OPlus package signatures.</string>
+    <string name="downloads_progress">%1$s / %2$s</string>
+    <string name="downloads_speed">%1$s/s</string>
+    <string name="downloads_pause">Pause</string>
+    <string name="downloads_cancel">Cancel</string>
+    <string name="downloads_resume">Resume</string>
+    <string name="downloads_state_paused">Paused (%1$s)</string>
+    <string name="downloads_state_retrying">Retrying (%1$d/%2$d) - %3$s</string>
+    <string name="downloads_verifying">Verifying checksum...</string>
+    <string name="downloads_unverified">Downloaded, not verified</string>
+    <string name="downloads_unverified_body">No checksum was provided. Transfer integrity is unknown, and OPlus package signatures are not verified by this app.</string>
+    <string name="downloads_state_failed">Failed - %1$s</string>
+    <string name="downloads_retries_remaining">%1$d retries remaining</string>
+</resources>

@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,11 +59,11 @@ fun DownloadsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Downloads") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.downloads_title)) }) },
     ) { padding ->
         if (state.rows.isEmpty() && state.historyRows.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("No downloads yet.", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.downloads_empty), style = MaterialTheme.typography.bodyMedium)
             }
         } else {
             LazyColumn(
@@ -72,7 +73,7 @@ fun DownloadsScreen(
             ) {
                 if (state.rows.isNotEmpty()) {
                     item {
-                        SectionTitle("Active downloads")
+                        SectionTitle(stringResource(R.string.downloads_active_section))
                     }
                     items(state.rows, key = { it.taskId }) { row ->
                         DownloadRowCard(
@@ -85,7 +86,7 @@ fun DownloadsScreen(
                 }
                 if (state.historyRows.isNotEmpty()) {
                     item {
-                        SectionTitle("Package history")
+                        SectionTitle(stringResource(R.string.downloads_history_section))
                     }
                     items(state.historyRows, key = { it.id }) { row ->
                         HistoryRowCard(
@@ -119,7 +120,7 @@ private fun DownloadRowCard(
         )
         Spacer(Modifier.height(4.dp))
         when (val s = row.state) {
-            DownloadState.Queued -> StateLabel("Queued")
+            DownloadState.Queued -> StateLabel(stringResource(R.string.downloads_state_queued))
             is DownloadState.Running -> RunningContent(
                 state = s,
                 taskId = row.taskId,
@@ -136,7 +137,7 @@ private fun DownloadRowCard(
             DownloadState.Verifying -> VerifyingContent()
             DownloadState.Verified -> VerifiedContent()
             DownloadState.Unverified -> UnverifiedContent()
-            DownloadState.Canceled -> StateLabel("Canceled", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            DownloadState.Canceled -> StateLabel(stringResource(R.string.downloads_state_canceled), color = MaterialTheme.colorScheme.onSurfaceVariant)
             is DownloadState.Failed -> FailedContent(s)
         }
     }
@@ -153,7 +154,7 @@ private fun HistoryRowCard(
         Text(row.packageName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(4.dp))
         Text(
-            "${formatBytes(row.packageSize)} · ${row.sourceHost} · ${row.evidenceLabel}",
+            stringResource(R.string.downloads_history_meta, formatBytes(row.packageSize), row.sourceHost, row.evidenceLabel),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -170,15 +171,17 @@ private fun HistoryRowCard(
         OutlinedButton(onClick = { onDownload(row.id) }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.CloudDownload, contentDescription = null)
             Spacer(Modifier.size(8.dp))
-            Text("Download")
+            Text(stringResource(R.string.downloads_download))
         }
         Spacer(Modifier.height(8.dp))
+        val clipboardPackageLinkLabel = stringResource(R.string.downloads_clipboard_package_link)
+        val clipboardDownloadedPathLabel = stringResource(R.string.downloads_clipboard_downloaded_path)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = {
                     coroutineScope.launch {
                         clipboard.setClipEntry(
-                            ClipEntry(ClipData.newPlainText("OTA package link", row.downloadUrl)),
+                            ClipEntry(ClipData.newPlainText(clipboardPackageLinkLabel, row.downloadUrl)),
                         )
                     }
                 },
@@ -186,14 +189,14 @@ private fun HistoryRowCard(
             ) {
                 Icon(Icons.Filled.ContentCopy, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text("Copy link")
+                Text(stringResource(R.string.downloads_copy_link))
             }
             row.localFilePath?.let { path ->
                 OutlinedButton(
                     onClick = {
                         coroutineScope.launch {
                             clipboard.setClipEntry(
-                                ClipEntry(ClipData.newPlainText("Downloaded OTA path", path)),
+                                ClipEntry(ClipData.newPlainText(clipboardDownloadedPathLabel, path)),
                             )
                         }
                     },
@@ -201,7 +204,7 @@ private fun HistoryRowCard(
                 ) {
                     Icon(Icons.Filled.ContentCopy, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text("Copy path")
+                    Text(stringResource(R.string.downloads_copy_path))
                 }
             }
         }
@@ -210,9 +213,9 @@ private fun HistoryRowCard(
 
 @Composable
 private fun VerifiedContent() {
-    StateLabel("Transfer verified", color = MaterialTheme.colorScheme.primary)
+    StateLabel(stringResource(R.string.downloads_transfer_verified), color = MaterialTheme.colorScheme.primary)
     Text(
-        "Hash verification confirms download transfer integrity, not OPlus package signatures.",
+        stringResource(R.string.downloads_transfer_verified_body),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -241,12 +244,18 @@ private fun RunningContent(
     }
     Spacer(Modifier.height(4.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("${formatBytes(state.downloadedBytes)} / ${target?.let(::formatBytes) ?: "?"}", style = MaterialTheme.typography.bodySmall)
-        Text(state.speedBytesPerSec?.let { "${formatBytes(it)}/s" } ?: "—", style = MaterialTheme.typography.bodySmall)
+        Text(
+            stringResource(R.string.downloads_progress, formatBytes(state.downloadedBytes), target?.let(::formatBytes) ?: "?"),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(
+            state.speedBytesPerSec?.let { stringResource(R.string.downloads_speed, formatBytes(it)) } ?: "—",
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { onPause(taskId) }, modifier = Modifier.weight(1f)) { Text("Pause") }
-        TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.weight(1f)) { Text("Cancel") }
+        OutlinedButton(onClick = { onPause(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_pause)) }
+        TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_cancel)) }
     }
 }
 
@@ -257,16 +266,19 @@ private fun PausedContent(
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
 ) {
-    StateLabel("Paused (${state.reason.name.lowercase()})", color = MaterialTheme.colorScheme.tertiary)
+    StateLabel(stringResource(R.string.downloads_state_paused, state.reason.name.lowercase()), color = MaterialTheme.colorScheme.tertiary)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { onResume(taskId) }, modifier = Modifier.weight(1f)) { Text("Resume") }
-        TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.weight(1f)) { Text("Cancel") }
+        OutlinedButton(onClick = { onResume(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_resume)) }
+        TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_cancel)) }
     }
 }
 
 @Composable
 private fun RetryingContent(state: DownloadState.Retrying) {
-    StateLabel("Retrying (${state.attempt}/${state.maxAttempts}) — ${state.category.name.lowercase()}", color = MaterialTheme.colorScheme.tertiary)
+    StateLabel(
+        stringResource(R.string.downloads_state_retrying, state.attempt, state.maxAttempts, state.category.name.lowercase()),
+        color = MaterialTheme.colorScheme.tertiary,
+    )
     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 }
 
@@ -274,15 +286,15 @@ private fun RetryingContent(state: DownloadState.Retrying) {
 private fun VerifyingContent() {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         CircularProgressIndicator(modifier = Modifier.height(16.dp))
-        Text("Verifying checksum…", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.downloads_verifying), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
 private fun UnverifiedContent() {
-    StateLabel("Downloaded, not verified", color = MaterialTheme.colorScheme.tertiary)
+    StateLabel(stringResource(R.string.downloads_unverified), color = MaterialTheme.colorScheme.tertiary)
     Text(
-        "No checksum was provided. Transfer integrity is unknown, and OPlus package signatures are not verified by this app.",
+        stringResource(R.string.downloads_unverified_body),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -290,9 +302,9 @@ private fun UnverifiedContent() {
 
 @Composable
 private fun FailedContent(state: DownloadState.Failed) {
-    StateLabel("Failed — ${state.category.name.lowercase()}", color = MaterialTheme.colorScheme.error)
+    StateLabel(stringResource(R.string.downloads_state_failed, state.category.name.lowercase()), color = MaterialTheme.colorScheme.error)
     if (state.retriesRemaining > 0) {
-        Text("${state.retriesRemaining} retries remaining", style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.downloads_retries_remaining, state.retriesRemaining), style = MaterialTheme.typography.bodySmall)
     }
     state.raw?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
