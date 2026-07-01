@@ -14,6 +14,7 @@ android {
 dependencies {
     implementation(project(":core-model"))
     implementation(libs.okhttp)
+    implementation(libs.json)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)
