@@ -245,6 +245,42 @@ class WorkScheduledDownloadEngineTest {
     }
 
     @Test
+    fun `rescheduleRecoverableTasks queues retriable failed task with retries remaining`() = runTest {
+        val store = RecordingDownloadTaskStore(
+            initialTasks = listOf(
+                storedTask(
+                    taskId = "network-failed",
+                    state = DownloadState.Failed(
+                        category = OtaErrorCategory.Network,
+                        retriesRemaining = 1,
+                        raw = "timeout",
+                    ),
+                ),
+                storedTask(
+                    taskId = "checksum-failed",
+                    state = DownloadState.Failed(
+                        category = OtaErrorCategory.ChecksumMismatch,
+                        retriesRemaining = 1,
+                        raw = "mismatch",
+                    ),
+                ),
+            ),
+        )
+        val scheduler = RecordingDownloadWorkScheduler()
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/recover-failed"),
+        )
+
+        engine.rescheduleRecoverableTasks()
+
+        assertEquals(listOf("network-failed"), scheduler.scheduled)
+        assertEquals(DownloadState.Queued, store.getTask("network-failed")?.state)
+        assertTrue(store.getTask("checksum-failed")?.state is DownloadState.Failed)
+    }
+
+    @Test
     fun `terminal verified task ignores pause resume and cancel controls`() = runTest {
         val store = RecordingDownloadTaskStore(
             initialTasks = listOf(
