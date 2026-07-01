@@ -1,0 +1,9 @@
+<root>
+  <Command>NEW_VERSION</Command>
+  <versionName>LE2120_14.0.0.1901(CN01)</versionName>
+  <type>full</type>
+  <size>{{sizeBytes}}</size>
+  <md5>{{md5}}</md5>
+  <url>{{downloadUrl}}</url>
+  <releaseNotes>Controlled end-to-end OTA fixture.</releaseNotes>
+</root>

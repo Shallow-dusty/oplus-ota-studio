@@ -57,6 +57,9 @@ end-to-end download evidence, and release packaging polish.
 - `SimpleDownloadEngine` streams to `.zip.part`, throttles progress, emits
   speed, verifies checksum, promotes verified/unverified files, quarantines
   checksum mismatches as `.zip.bad`, and persists state before UI notification.
+- An app-level controlled smoke test parses a synthetic legacy OTA success
+  fixture, downloads its package from `MockWebServer`, verifies MD5, and promotes
+  the final ZIP through the real download engine.
 - Resume handling covers range requests, ignored ranges, rejected ranges,
   changed validators, partial truncation, and restart-from-zero paths.
 - WorkManager scheduling respects Wi-Fi-only preference and battery-not-low
@@ -125,7 +128,9 @@ end-to-end download evidence, and release packaging polish.
 - Local emulator validation now covers API 26, API 29, API 30, and API 34
   storage promotion behavior.
 - No committed `captured-real-*` or `replayed-real-profile-*` successful OTA
-  response fixture exists yet.
+  response fixture exists yet; a local 2026-07-01 replay attempt against
+  `otacn.oppo.com/OnePlusOTA/OnePlus_OTA.php` did not complete the TLS/HTTP
+  handshake from this Windows host.
 - The ColorOS component parser is synthetic-schema coverage, not proof of a live
   server chain.
 - v0.2 still requires at least one live-endpoint verified region if v0.1 ships
@@ -133,7 +138,7 @@ end-to-end download evidence, and release packaging polish.
 
 ### Download/Product Flow
 
-- Full ZIP end-to-end validation still needs device/emulator evidence.
+- Full ZIP end-to-end validation on a device/emulator still needs evidence.
 - Checksum mismatch expected/actual hashes are exposed in task failure details,
   but persisting them into structured history/debug records is now a hardening
   item, not the next product-flow blocker.
@@ -167,6 +172,6 @@ adb devices
 
 1. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
-2. Run a minimal end-to-end download smoke using a controlled OTA fixture.
+2. Run a device/emulator end-to-end download smoke with a controlled OTA fixture.
 3. Persist checksum mismatch expected/actual hash as structured history/debug
    metadata during release hardening.
