@@ -25,6 +25,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
@@ -54,6 +55,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LookupScreen(
     factory: () -> LookupViewModel,
+    onDownloadQueued: () -> Unit = {},
 ) {
     val viewModel: LookupViewModel = viewModel(factory = viewModelFactory { initializer { factory() } })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -74,7 +76,10 @@ fun LookupScreen(
                 is LookupUiState.PackageFound -> PackageFoundContent(
                     pkg = s.pkg,
                     liveLookupExperimental = s.liveLookupExperimental,
-                    onDownload = viewModel::enqueueDownload,
+                    onDownload = { pkg ->
+                        viewModel.enqueueDownload(pkg)
+                        onDownloadQueued()
+                    },
                     onReset = viewModel::reset,
                 )
                 LookupUiState.NoUpdate -> NoUpdateContent(viewModel::reset)
@@ -249,6 +254,8 @@ private fun PackageFoundContent(
         }
         Spacer(Modifier.height(16.dp))
         Button(onClick = { onDownload(pkg) }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.CloudDownload, contentDescription = null)
+            Spacer(Modifier.size(8.dp))
             Text("Download package")
         }
         OutlinedButton(

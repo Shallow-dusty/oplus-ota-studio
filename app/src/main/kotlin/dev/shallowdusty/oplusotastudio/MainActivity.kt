@@ -109,6 +109,15 @@ private fun OtaStudioApp() {
                             privacyConsentStore = graph.lookupPrivacyConsentStore,
                         )
                     },
+                    onDownloadQueued = {
+                        navController.navigate(Dest.Downloads.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                 )
             }
             composable(Dest.Downloads.route) {
