@@ -146,8 +146,12 @@ end-to-end download evidence, and release packaging polish.
 ### Release Readiness
 
 - UI tests/screenshot tests for every lookup/download state are not complete.
+- Debug and unsigned release APK assembly passed locally on 2026-07-01 via
+  `:app:assembleDebug :app:assembleRelease`; produced `app-debug.apk` and
+  `app-release-unsigned.apk` with `versionName` `0.0.1`.
 - Release build still has R8 disabled; v0.3 requires R8 release install/run
   evidence.
+- Signed release packaging and v0.1 versioning are not configured yet.
 - The repository should stay private until v0.3 release-candidate readiness.
 
 ## Verification Snapshot
@@ -173,5 +177,6 @@ adb devices
 1. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
 2. Run a device/emulator end-to-end download smoke with a controlled OTA fixture.
-3. Persist checksum mismatch expected/actual hash as structured history/debug
+3. Configure private-trial signing/versioning when cutting a v0.1 artifact.
+4. Persist checksum mismatch expected/actual hash as structured history/debug
    metadata during release hardening.
