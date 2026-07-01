@@ -22,7 +22,7 @@ yet.
 
 The remaining release blockers are mostly evidence and end-to-end validation:
 real device detection evidence, live/captured/replayed OTA lookup evidence,
-API 29/API 34 storage promotion results, and release packaging polish.
+API 26 storage behavior, and release packaging polish.
 
 ## Implemented
 
@@ -91,6 +91,11 @@ API 29/API 34 storage promotion results, and release packaging polish.
   `connectedDebugAndroidTest` passed
   `AndroidMediaStoreDownloadFilePromoterInstrumentedTest.promotesZipIntoDownloadsCollectionOnScopedStorage`
   on `Vector_API30(AVD) - 11`, SDK 30.
+- Local API 29 and API 34 emulator evidence on 2026-07-01:
+  `:app:connectedDebugAndroidTest` passed
+  `AndroidMediaStoreDownloadFilePromoterInstrumentedTest.promotesZipIntoDownloadsCollectionOnScopedStorage`
+  on `OPlus_API29(AVD) - 10` and `OPlus_API34(AVD) - 14`; XML
+  results are retained under `docs/evidence/instrumentation/`.
 - CI includes unit/lint plus emulator instrumentation jobs for API 29 and API 34.
 - Manifest disables cleartext traffic and declares foreground data-sync service
   support.
@@ -109,8 +114,8 @@ API 29/API 34 storage promotion results, and release packaging polish.
 - No real device is currently attached locally, so device detection and
   MediaStore flows have not been locally run on a physical OnePlus/OPlus device
   in this snapshot.
-- Local emulator validation currently covers API 30 only; API 29 and API 34
-  instrumentation evidence is still missing.
+- Local emulator validation now covers API 29, API 30, and API 34 storage
+  promotion behavior.
 - No committed `captured-real-*` or `replayed-real-profile-*` successful OTA
   response fixture exists yet.
 - The ColorOS component parser is synthetic-schema coverage, not proof of a live
@@ -155,8 +160,7 @@ adb devices
 
 ## Next Recommended Work
 
-1. Run connected instrumentation on API 29 and API 34, and record or document
-   API 26 behavior.
+1. Record or document API 26 storage behavior.
 2. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
 3. Persist checksum mismatch expected/actual hash as structured history/debug

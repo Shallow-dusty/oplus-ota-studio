@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="1" failures="0" errors="0" skipped="0" time="3.414" timestamp="2026-07-01T08:03:21" hostname="localhost">
+  <testsuite name="dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoterInstrumentedTest" tests="1" failures="0" errors="0" skipped="0" time="0.079" timestamp="2026-07-01T08:03:21" hostname="localhost">
+    <properties>
+      <property name="device" value="OPlus_API29(AVD) - 10" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="promotesZipIntoDownloadsCollectionOnScopedStorage" classname="dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoterInstrumentedTest" time="0.079" />
+  </testsuite>
+</testsuites>
