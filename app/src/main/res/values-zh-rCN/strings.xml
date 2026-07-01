@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">OPlus OTA Studio</string>
+    <string name="nav_lookup">查询</string>
+    <string name="nav_downloads">下载</string>
+</resources>

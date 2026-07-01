@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">OPlus OTA Studio</string>
+    <string name="nav_lookup">Lookup</string>
+    <string name="nav_downloads">Downloads</string>
+</resources>

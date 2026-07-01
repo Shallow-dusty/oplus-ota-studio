@@ -17,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -43,15 +45,16 @@ class MainActivity : ComponentActivity() {
 
 private sealed interface Dest {
     val route: String
-    val label: String
+    @get:StringRes
+    val labelRes: Int
 
     data object Lookup : Dest {
         override val route = "lookup"
-        override val label = "Lookup"
+        override val labelRes = R.string.nav_lookup
     }
     data object Downloads : Dest {
         override val route = "downloads"
-        override val label = "Downloads"
+        override val labelRes = R.string.nav_downloads
     }
 }
 
@@ -68,6 +71,7 @@ private fun OtaStudioApp() {
             NavigationBar {
                 destinations.forEach { dest ->
                     val selected = current?.hierarchy?.any { it.route == dest.route } == true
+                    val label = stringResource(dest.labelRes)
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
@@ -82,10 +86,10 @@ private fun OtaStudioApp() {
                         icon = {
                             Icon(
                                 imageVector = if (dest is Dest.Lookup) Icons.Filled.Search else Icons.Filled.CloudDownload,
-                                contentDescription = dest.label,
+                                contentDescription = label,
                             )
                         },
-                        label = { Text(dest.label) },
+                        label = { Text(label) },
                     )
                 }
             }
