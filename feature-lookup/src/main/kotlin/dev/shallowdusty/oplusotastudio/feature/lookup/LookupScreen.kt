@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,7 +71,7 @@ fun LookupScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("OTA Lookup") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.lookup_title)) }) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
@@ -108,24 +109,24 @@ private fun PrivacyDisclosureContent(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Before lookup", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.lookup_before_title), style = MaterialTheme.typography.headlineSmall)
         Text(
-            "This app queries OPlus servers with your device build info. The request includes the model, region, and OTA version shown below.",
+            stringResource(R.string.lookup_privacy_body),
             style = MaterialTheme.typography.bodyMedium,
         )
-        SummaryRow("Model", state.profile.model)
-        SummaryRow("Region", state.profile.region.name)
-        SummaryRow("OTA version", state.profile.otaVersion)
+        SummaryRow(stringResource(R.string.lookup_label_model), state.profile.model)
+        SummaryRow(stringResource(R.string.lookup_label_region), state.profile.region.name)
+        SummaryRow(stringResource(R.string.lookup_label_ota_version), state.profile.otaVersion)
         Text(
-            "Serial and IMEI are not sent.",
+            stringResource(R.string.lookup_privacy_no_serial),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(onClick = onContinue, modifier = Modifier.fillMaxWidth()) {
-            Text("Continue lookup")
+            Text(stringResource(R.string.lookup_continue))
         }
         OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-            Text("Back")
+            Text(stringResource(R.string.lookup_back))
         }
     }
 }
@@ -136,7 +137,7 @@ private fun DetectingContent() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(Modifier.height(12.dp))
-            Text("Detecting device…", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.lookup_detecting), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -147,7 +148,7 @@ private fun QueryingContent() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(Modifier.height(12.dp))
-            Text("Querying OTA service…", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.lookup_querying), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -167,18 +168,18 @@ private fun ReadyContent(
             DeviceSummary(state.device)
             HorizontalDivider()
         }
-        Text("Profile", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.lookup_profile_title), style = MaterialTheme.typography.titleMedium)
         OutlinedTextField(
             value = profile.model,
             onValueChange = { onProfileChange(profile.copy(model = it)) },
-            label = { Text("Model") },
+            label = { Text(stringResource(R.string.lookup_label_model)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = profile.otaVersion,
             onValueChange = { onProfileChange(profile.copy(otaVersion = it)) },
-            label = { Text("OTA version (build string)") },
+            label = { Text(stringResource(R.string.lookup_label_ota_version_build)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -197,7 +198,7 @@ private fun ReadyContent(
         ) {
             Icon(Icons.Filled.Search, contentDescription = null)
             Spacer(Modifier.size(8.dp))
-            Text("Look up update")
+            Text(stringResource(R.string.lookup_profile_action))
         }
     }
 }
@@ -209,7 +210,7 @@ private fun RegionSelector(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Region", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.lookup_label_region), style = MaterialTheme.typography.titleSmall)
         Box {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
                 Text(region.name)
@@ -248,13 +249,13 @@ private fun AdvancedHostOverride(
                     }
                 },
             )
-            Text("Advanced host override", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.lookup_advanced_host_override), style = MaterialTheme.typography.bodyMedium)
         }
         if (expanded) {
             OutlinedTextField(
                 value = profile.hostOverride.orEmpty(),
                 onValueChange = { onProfileChange(profile.copy(hostOverride = it)) },
-                label = { Text("OTA host") },
+                label = { Text(stringResource(R.string.lookup_label_ota_host)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -265,16 +266,16 @@ private fun AdvancedHostOverride(
 @Composable
 private fun DeviceSummary(device: dev.shallowdusty.oplusotastudio.core.model.DeviceProfile) {
     Column {
-        Text("Detected device", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.lookup_detected_device), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
-        SummaryRow("Model", device.model)
-        SummaryRow("Marketing name", device.marketingName)
-        SummaryRow("OTA version", device.otaVersion)
-        SummaryRow("Android", device.androidVersion)
-        SummaryRow("Region", device.region?.name)
+        SummaryRow(stringResource(R.string.lookup_label_model), device.model)
+        SummaryRow(stringResource(R.string.lookup_label_marketing_name), device.marketingName)
+        SummaryRow(stringResource(R.string.lookup_label_ota_version), device.otaVersion)
+        SummaryRow(stringResource(R.string.lookup_label_android), device.androidVersion)
+        SummaryRow(stringResource(R.string.lookup_label_region), device.region?.name)
         if (device.incomplete) {
             Text(
-                "Detection incomplete — some fields need manual entry.",
+                stringResource(R.string.lookup_detection_incomplete),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -308,44 +309,45 @@ private fun PackageFoundContent(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Update available", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-        SummaryRow("Version", pkg.versionName)
-        SummaryRow("Type", pkg.type)
-        SummaryRow("Size", formatBytes(pkg.sizeBytes))
-        SummaryRow("Source", pkg.sourceHost)
-        SummaryRow("Evidence", pkg.evidenceLevel.stableId)
+        Text(stringResource(R.string.lookup_update_available), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        SummaryRow(stringResource(R.string.lookup_label_version), pkg.versionName)
+        SummaryRow(stringResource(R.string.lookup_label_type), pkg.type)
+        SummaryRow(stringResource(R.string.lookup_label_size), formatBytes(pkg.sizeBytes))
+        SummaryRow(stringResource(R.string.lookup_label_source), pkg.sourceHost)
+        SummaryRow(stringResource(R.string.lookup_label_evidence), pkg.evidenceLevel.stableId)
         if (liveLookupExperimental) {
             Text(
-                "Live lookup support is experimental until this chain is live-verified.",
+                stringResource(R.string.lookup_experimental_notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        SummaryRow("MD5", pkg.md5)
-        SummaryRow("SHA-256", pkg.sha256)
+        SummaryRow(stringResource(R.string.lookup_label_md5), pkg.md5)
+        SummaryRow(stringResource(R.string.lookup_label_sha256), pkg.sha256)
         Text(
-            "This app verifies download transfer integrity when hashes are available. It does not verify OPlus package signatures.",
+            stringResource(R.string.lookup_verification_scope),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         val notes = pkg.releaseNotes
         if (notes != null) {
             Spacer(Modifier.height(8.dp))
-            Text("Release notes", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.lookup_release_notes), style = MaterialTheme.typography.titleMedium)
             Text(notes, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(16.dp))
         Button(onClick = { onDownload(pkg) }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.CloudDownload, contentDescription = null)
             Spacer(Modifier.size(8.dp))
-            Text("Download package")
+            Text(stringResource(R.string.lookup_download_package))
         }
+        val clipboardPackageLinkLabel = stringResource(R.string.lookup_clipboard_package_link)
         OutlinedButton(
             onClick = {
                 coroutineScope.launch {
                     clipboard.setClipEntry(
                         ClipEntry(
-                            ClipData.newPlainText("OTA package link", pkg.downloadUrl),
+                            ClipData.newPlainText(clipboardPackageLinkLabel, pkg.downloadUrl),
                         ),
                     )
                 }
@@ -354,10 +356,10 @@ private fun PackageFoundContent(
         ) {
             Icon(Icons.Filled.ContentCopy, contentDescription = null)
             Spacer(Modifier.size(8.dp))
-            Text("Copy link")
+            Text(stringResource(R.string.lookup_copy_link))
         }
         OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
-            Text("Back to lookup")
+            Text(stringResource(R.string.lookup_back_to_lookup))
         }
     }
 }
@@ -368,9 +370,9 @@ private fun NoUpdateContent(onReset: () -> Unit) {
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Up to date", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-        Text("No update is available for this profile.", style = MaterialTheme.typography.bodyMedium)
-        OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text("Back to lookup") }
+        Text(stringResource(R.string.lookup_up_to_date), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.lookup_no_update), style = MaterialTheme.typography.bodyMedium)
+        OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lookup_back_to_lookup)) }
     }
 }
 
@@ -380,7 +382,7 @@ private fun ErrorContent(state: LookupUiState.Error, onReset: () -> Unit) {
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Lookup failed", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error)
+        Text(stringResource(R.string.lookup_failed), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error)
         Text(categoryLabel(state.category), style = MaterialTheme.typography.bodyMedium)
         if (state.raw != null) {
             Text(
@@ -390,18 +392,19 @@ private fun ErrorContent(state: LookupUiState.Error, onReset: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text("Back to lookup") }
+        OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lookup_back_to_lookup)) }
     }
 }
 
+@Composable
 private fun categoryLabel(c: dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory): String = when (c) {
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Network -> "Network problem: could not reach the OTA service."
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Server -> "Server problem: the OTA service returned an error."
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Malformed -> "Malformed response: the server reply could not be parsed."
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Device -> "Device/profile problem: check the model and build string."
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.File -> "File problem."
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.ChecksumMismatch -> "Checksum mismatch."
-    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Unknown -> "Unknown error."
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Network -> stringResource(R.string.lookup_error_network)
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Server -> stringResource(R.string.lookup_error_server)
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Malformed -> stringResource(R.string.lookup_error_malformed)
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Device -> stringResource(R.string.lookup_error_device)
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.File -> stringResource(R.string.lookup_error_file)
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.ChecksumMismatch -> stringResource(R.string.lookup_error_checksum)
+    dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Unknown -> stringResource(R.string.lookup_error_unknown)
 }
 
 private fun formatBytes(bytes: Long): String {
