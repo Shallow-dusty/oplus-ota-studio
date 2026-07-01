@@ -9,9 +9,8 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `3a16144 docs: record API29 and API34 instrumentation evidence`
-- Working tree at the start of this continuation: API26 storage permission/test evidence changes in progress
-- Local connected-device check on 2026-07-01: `adb devices` reported no attached devices
+- Latest implementation commit at this snapshot: `d34cf11 fix: parse legacy OTA XML on Android`
+- Local connected-device check on 2026-07-01: `adb devices` reported `emulator-5554 device`
 
 ## Current Product Status
 
@@ -20,9 +19,9 @@ backend wiring for lookup, downloads, storage, logging, diagnostics, and
 WorkManager-backed download execution, but it is not a complete product release
 yet.
 
-The remaining release blockers are mostly evidence and end-to-end validation:
+The remaining release blockers are mostly evidence and release packaging:
 real device detection evidence, live/captured/replayed OTA lookup evidence,
-end-to-end download evidence, and release packaging polish.
+and private-trial signing/versioning polish.
 
 ## Implemented
 
@@ -60,6 +59,9 @@ end-to-end download evidence, and release packaging polish.
 - An app-level controlled smoke test parses a synthetic legacy OTA success
   fixture, downloads its package from `MockWebServer`, verifies MD5, and promotes
   the final ZIP through the real download engine.
+- An API 34 Android runtime controlled smoke test parses a synthetic legacy OTA
+  success fixture, downloads its package through `SimpleDownloadEngine`, verifies
+  MD5, and promotes the final ZIP through `MediaStore.Downloads`.
 - Resume handling covers range requests, ignored ranges, rejected ranges,
   changed validators, partial truncation, and restart-from-zero paths.
 - WorkManager scheduling respects Wi-Fi-only preference and battery-not-low
@@ -100,8 +102,10 @@ end-to-end download evidence, and release packaging polish.
 - Local API 29 and API 34 emulator evidence on 2026-07-01:
   `:app:connectedDebugAndroidTest` passed
   `AndroidMediaStoreDownloadFilePromoterInstrumentedTest.promotesZipIntoDownloadsCollectionOnScopedStorage`
-  on `OPlus_API29(AVD) - 10` and `OPlus_API34(AVD) - 14`; XML
-  results are retained under `docs/evidence/instrumentation/`.
+  on `OPlus_API29(AVD) - 10` and `OPlus_API34(AVD) - 14`; the API 34 run also
+  passed
+  `AndroidOtaLookupDownloadSmokeInstrumentedTest.parsesControlledOtaFixtureAndPromotesDownloadedZip`.
+  XML results are retained under `docs/evidence/instrumentation/`.
 - Local API 26 emulator evidence on 2026-07-01:
   `:app:connectedDebugAndroidTest` passed
   `AndroidMediaStoreDownloadFilePromoterInstrumentedTest.promotesZipIntoPublicDownloadsOnLegacyStorage`
@@ -126,7 +130,8 @@ end-to-end download evidence, and release packaging polish.
   MediaStore flows have not been locally run on a physical OnePlus/OPlus device
   in this snapshot.
 - Local emulator validation now covers API 26, API 29, API 30, and API 34
-  storage promotion behavior.
+  storage promotion behavior, plus an API 34 controlled end-to-end download
+  smoke through parser, engine, checksum verification, and MediaStore promotion.
 - No committed `captured-real-*` or `replayed-real-profile-*` successful OTA
   response fixture exists yet; a local 2026-07-01 replay attempt against
   `otacn.oppo.com/OnePlusOTA/OnePlus_OTA.php` did not complete the TLS/HTTP
@@ -138,7 +143,6 @@ end-to-end download evidence, and release packaging polish.
 
 ### Download/Product Flow
 
-- Full ZIP end-to-end validation on a device/emulator still needs evidence.
 - Checksum mismatch expected/actual hashes are exposed in task failure details,
   but persisting them into structured history/debug records is now a hardening
   item, not the next product-flow blocker.
@@ -170,13 +174,13 @@ Additional checks used during this phase:
 ```powershell
 go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/ci.yml
 adb devices
+.\gradlew.bat :app:connectedDebugAndroidTest
 ```
 
 ## Next Recommended Work
 
 1. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
-2. Run a device/emulator end-to-end download smoke with a controlled OTA fixture.
-3. Configure private-trial signing/versioning when cutting a v0.1 artifact.
-4. Persist checksum mismatch expected/actual hash as structured history/debug
+2. Configure private-trial signing/versioning when cutting a v0.1 artifact.
+3. Persist checksum mismatch expected/actual hash as structured history/debug
    metadata during release hardening.
