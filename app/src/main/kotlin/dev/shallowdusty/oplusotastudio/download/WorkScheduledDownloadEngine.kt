@@ -7,6 +7,8 @@ import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
+import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
+import dev.shallowdusty.oplusotastudio.core.model.isRetriable
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
@@ -59,6 +61,22 @@ class WorkScheduledDownloadEngine(
             tasks.map { task -> storedTaskHandle(task.taskId, File(task.tempFilePath)) }
         }
 
+    suspend fun rescheduleRecoverableTasks() {
+        taskStore.observeTasks()
+            .first()
+            .filter { task -> task.shouldRecover }
+            .forEach { task ->
+                if (task.state != DownloadState.Queued) {
+                    taskStore.updateState(
+                        taskId = task.taskId,
+                        state = DownloadState.Queued,
+                        updatedAtMs = nowMs(),
+                    )
+                }
+                scheduler.schedule(task.taskId)
+            }
+    }
+
     private fun storedTaskHandle(
         taskId: String,
         tempFile: File,
@@ -106,6 +124,22 @@ class WorkScheduledDownloadEngine(
         const val DefaultMaxQueuedTasks = 20
     }
 }
+
+private val StoredDownloadTask.shouldRecover: Boolean
+    get() =
+        when (val current = state) {
+            DownloadState.Queued,
+            is DownloadState.Running,
+            is DownloadState.Retrying,
+            DownloadState.Verifying,
+            -> true
+            is DownloadState.Paused -> current.reason != DownloadState.Paused.PauseReason.User
+            is DownloadState.Failed -> current.category.isRetriable && current.retriesRemaining > 0
+            DownloadState.Verified,
+            DownloadState.Unverified,
+            DownloadState.Canceled,
+            -> false
+        }
 
 private class RejectedDownloadTask(
     override val taskId: String,

@@ -207,6 +207,44 @@ class WorkScheduledDownloadEngineTest {
     }
 
     @Test
+    fun `rescheduleRecoverableTasks queues interrupted running task`() = runTest {
+        val store = RecordingDownloadTaskStore(
+            initialTasks = listOf(
+                storedTask(
+                    taskId = "running",
+                    state = DownloadState.Running(
+                        downloadedBytes = 5L,
+                        targetSize = 10L,
+                        speedBytesPerSec = null,
+                    ),
+                ),
+                storedTask(
+                    taskId = "paused",
+                    state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+                ),
+            ),
+        )
+        val scheduler = RecordingDownloadWorkScheduler()
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/recover-running"),
+        )
+
+        engine.rescheduleRecoverableTasks()
+
+        assertEquals(listOf("running"), scheduler.scheduled)
+        assertEquals(
+            DownloadState.Queued,
+            store.getTask("running")?.state,
+        )
+        assertEquals(
+            DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+            store.getTask("paused")?.state,
+        )
+    }
+
+    @Test
     fun `terminal verified task ignores pause resume and cancel controls`() = runTest {
         val store = RecordingDownloadTaskStore(
             initialTasks = listOf(
