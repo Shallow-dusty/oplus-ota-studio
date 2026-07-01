@@ -9,7 +9,7 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `594af6a feat: clarify OTA verification scope`
+- Latest implementation commit at this snapshot: `3eec982 feat: localize download notification copy`
 - Working tree at the start of this documentation pass: clean
 - Local connected-device check on 2026-07-01: `adb devices` reported no attached devices
 
@@ -78,6 +78,8 @@ API 29/API 34 storage promotion results, and release packaging polish.
   host override field backed by existing profile validation.
 - Lookup and download screens state that hash checks verify transfer integrity
   only and do not verify OPlus package signatures.
+- Primary app, lookup, downloads, and foreground notification copy now uses
+  `en` and `zh-rCN` string resources.
 - DataStore backs download preferences and lookup privacy consent.
 
 ### Files And Platform Integration
@@ -128,8 +130,6 @@ API 29/API 34 storage promotion results, and release packaging polish.
 
 ### Release Readiness
 
-- User-facing strings are still mostly inline Compose text; `en` and `zh-rCN`
-  resources are not complete.
 - UI tests/screenshot tests for every lookup/download state are not complete.
 - Release build still has R8 disabled; v0.3 requires R8 release install/run
   evidence.
@@ -159,6 +159,5 @@ adb devices
    API 26 behavior.
 2. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
-3. Move user-facing strings into `en` and `zh-rCN` resources.
-4. Persist checksum mismatch expected/actual hash as structured history/debug
+3. Persist checksum mismatch expected/actual hash as structured history/debug
    metadata during release hardening.
