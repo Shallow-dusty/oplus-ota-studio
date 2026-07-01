@@ -5,9 +5,11 @@ profile setup, package lookup, resumable download, integrity verification, and
 clear status feedback — running entirely on the phone, no root required for the
 normal lookup/download flow.
 
-> **Status:** v0.0 — revertable foundation (scaffold + domain contracts + UI
-> shell with fake bindings). Real protocol/download/storage implementations are
-> landing incrementally; see the design spec for the milestone roadmap.
+> **Status:** backend-core in progress. The app now has real lookup, download,
+> storage, WorkManager, logging, diagnostics, and MediaStore promotion wiring.
+> It is not release-complete yet: real-device/live OTA evidence, history/detail
+> polish, localization, and connected instrumentation evidence are still open.
+> See [`docs/progress.md`](docs/progress.md) for the current progress panel.
 
 ## Project layout
 
@@ -26,9 +28,10 @@ strictly one-way (lower layers never depend on higher layers):
 
 `core-model` defines the service contracts (`OtaLookupService`,
 `DownloadEngine`, `DeviceDetector`, `PackageRepository`); feature modules depend
-only on those interfaces, and `app` injects the implementation. During v0.0 the
-app injects **fake** implementations so the UI compiles and runs before the
-backend modules exist.
+only on those interfaces, and `app` injects the implementation. Normal app
+startup now uses real Room/DataStore, WorkManager, MediaStore promotion,
+logging, diagnostics, device detection, and legacy OTA lookup wiring.
+`AppGraph` still keeps fake defaults for tests and non-Application construction.
 
 ## Design spec
 
@@ -36,6 +39,8 @@ The authoritative design and delivery plan lives at
 [`docs/superpowers/specs/2026-06-29-oplus-ota-studio-design.md`](docs/superpowers/specs/2026-06-29-oplus-ota-studio-design.md).
 Every architectural decision (protocol contract, device detection, download
 state machine, storage, error taxonomy, milestones) is documented there.
+Current implementation progress is tracked in
+[`docs/progress.md`](docs/progress.md).
 
 ## Build
 

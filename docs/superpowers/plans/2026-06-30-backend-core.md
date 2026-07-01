@@ -2,6 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Current status (2026-07-01):** This was the initial backend-core execution
+> plan. Its scope has been implemented and expanded by later commits on
+> `feat/backend-core` (real app wiring, storage, WorkManager, diagnostics,
+> MediaStore promotion, evidence labels, and history metadata). Use
+> [`../../progress.md`](../../progress.md) for the live progress panel and the
+> current next-work queue.
+
 **Goal:** Add the first real backend modules for OTA request/response parsing and download state/checksum logic while keeping the Android UI unchanged.
 
 **Architecture:** `core-ota` implements protocol-neutral request construction, host resolution, and fixture-backed response parsing into `core-model` domain types. `core-download` implements a pure Kotlin state machine and checksum verifier that can later be wrapped by WorkManager and storage promotion. Android-specific download IO and Room storage remain future slices.
