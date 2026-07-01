@@ -50,6 +50,9 @@ evidence and live/captured/replayed OTA lookup evidence.
   `captured-real`, `replayed-real-profile`, or `live-verified`.
 - Lookup UI state surfaces experimental disclosure when a package is not
   `live-verified`.
+- Lookup state presentation now has focused JVM coverage for detecting,
+  incomplete profile, privacy disclosure, querying, package found, no update,
+  and network/server/malformed error copy.
 
 ### Download And Verification
 
@@ -152,9 +155,8 @@ evidence and live/captured/replayed OTA lookup evidence.
 
 ### Release Readiness
 
-- Lookup state presentation tests and screenshot tests are not complete.
-- Download state presentation has focused JVM coverage, but screenshot tests are
-  still not complete.
+- Lookup and download state presentation have focused JVM coverage, but
+  screenshot tests are still not complete.
 - Debug and release APK assembly passed locally on 2026-07-01.
 - Private-trial versioning is configured as `versionCode` `10` and
   `versionName` `0.1.0`.
