@@ -1,0 +1,36 @@
+R8 release install/run smoke - 2026-07-01
+
+Environment:
+- AVD: OPlus_API34
+- Android release: 14
+- SDK: 34
+
+Build evidence:
+- Command: .\gradlew.bat :app:assembleRelease
+- Result: BUILD SUCCESSFUL
+- R8 task observed: :app:minifyReleaseWithR8
+- Unsigned artifact: app/build/outputs/apk/release/app-release-unsigned.apk
+- Unsigned artifact size after R8: 2,265,110 bytes
+- Mapping file: app/build/outputs/mapping/release/mapping.txt
+- Mapping size: 37,367,415 bytes
+
+Temporary signed smoke:
+- Command: .\gradlew.bat :app:assembleRelease with oplusOtaStudio.release* properties
+- Result: BUILD SUCCESSFUL
+- Signed artifact: app/build/outputs/apk/release/app-release.apk
+- Signed artifact size after R8: 2,277,398 bytes
+- apksigner verify --print-certs result: V2 signer reported
+- Temporary keystore path: %TEMP%\oplus-ota-studio-r8-signing-smoke\r8-release-smoke.jks
+- Temporary keystore cleanup: deleted after verification
+
+Install/start smoke:
+- Command: adb install -r app\build\outputs\apk\release\app-release.apk
+- Result: Success
+- Command: adb shell monkey -p dev.shallowdusty.oplusotastudio -c android.intent.category.LAUNCHER 1
+- Result: Events injected: 1
+- dumpsys evidence: topResumedActivity=dev.shallowdusty.oplusotastudio/.MainActivity
+- logcat crash scan after launch: no FATAL EXCEPTION or AndroidRuntime crash found
+
+Follow-up boundary:
+- This proves the R8 release APK builds, signs, installs, and starts on API 34.
+- It is not a full UI regression pass and does not replace real-device/live-OTA evidence.

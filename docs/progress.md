@@ -9,7 +9,7 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `a438e67 feat: persist checksum mismatch hashes`
+- Latest implementation commit at this snapshot: `7ae024e build: enable R8 for release`
 - Local connected-device check on 2026-07-01 after emulator shutdown:
   `adb devices` reported no attached devices.
 
@@ -150,16 +150,18 @@ evidence and live/captured/replayed OTA lookup evidence.
 ### Release Readiness
 
 - UI tests/screenshot tests for every lookup/download state are not complete.
-- Debug and release APK assembly passed locally on 2026-07-01 via
-  `:app:assembleDebug :app:assembleRelease`.
+- Debug and release APK assembly passed locally on 2026-07-01.
 - Private-trial versioning is configured as `versionCode` `10` and
   `versionName` `0.1.0`.
 - Release signing is configured from explicit Gradle properties or
   `OPLUS_OTA_STUDIO_RELEASE_*` environment variables. A local smoke build with
   a temporary throwaway keystore produced `app-release.apk`, and `apksigner
   verify --print-certs` reported a V2 signer.
-- Release build still has R8 disabled; v0.3 requires R8 release install/run
-  evidence.
+- Release builds now run R8 minification/obfuscation via
+  `:app:minifyReleaseWithR8`. Local API 34 evidence on 2026-07-01 installed the
+  temporary-signed R8 APK and launched `.MainActivity` without a detected
+  `AndroidRuntime`/fatal crash; details are retained under
+  `docs/evidence/release/`.
 - Durable private signing material is intentionally not committed; use
   `docs/release.md` for the local signing workflow.
 - The repository should stay private until v0.3 release-candidate readiness.
@@ -182,6 +184,8 @@ go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/ci.ym
 adb devices
 .\gradlew.bat :app:connectedDebugAndroidTest
 .\gradlew.bat :app:assembleDebug :app:assembleRelease
+.\gradlew.bat :app:assembleRelease
+adb install -r app\build\outputs\apk\release\app-release.apk
 ```
 
 ## Next Recommended Work
