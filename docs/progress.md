@@ -9,7 +9,7 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `91f8186 feat: persist package metadata in history`
+- Latest implementation commit at this snapshot: `2d6d54a feat: open downloads after queuing package`
 - Working tree at the start of this documentation pass: clean
 - Local connected-device check on 2026-07-01: `adb devices` reported no attached devices
 
@@ -22,8 +22,8 @@ yet.
 
 The remaining release blockers are mostly evidence and end-to-end validation:
 real device detection evidence, live/captured/replayed OTA lookup evidence,
-device/emulator storage promotion results, and UI/detail polish around history,
-copy-link, checksum mismatch, and release-copy limitations.
+device/emulator storage promotion results, advanced profile controls,
+release-copy limitations, and release packaging polish.
 
 ## Implemented
 
@@ -71,6 +71,10 @@ copy-link, checksum mismatch, and release-copy limitations.
 - Database schema is at version 3 with migrations `1 -> 2` and `2 -> 3`.
 - History now persists package metadata needed for later details/copy-link flows:
   source host, download URL, checksums, release notes, and evidence level.
+- Downloads now surfaces lookup history, copy-link/copy-path actions, and a
+  direct download action that reuses the persisted package metadata.
+- Starting a package download from lookup now opens the downloads screen so the
+  next visible step is queue/progress management.
 - DataStore backs download preferences and lookup privacy consent.
 
 ### Files And Platform Integration
@@ -107,8 +111,6 @@ copy-link, checksum mismatch, and release-copy limitations.
 
 - The app has a manual model/build profile edit path, but advanced progressive
   disclosure for region/host override is not complete.
-- Copy-link action, history details, and re-opened package metadata UI still need
-  to consume the newly persisted history fields.
 - Release copy/details must still consistently state that v1 verifies transfer
   integrity only, not OPlus package signatures.
 
@@ -116,10 +118,11 @@ copy-link, checksum mismatch, and release-copy limitations.
 
 - Full ZIP end-to-end validation with a forced network drop and final
   `MediaStore.Downloads` promotion still needs device/emulator evidence.
-- Checksum mismatch expected/actual hashes are exposed in task failure details,
-  but still need to be persisted into history/debug records as structured fields.
 - API 26 storage behavior still needs a recorded local result or documented
   emulator blocker before v0.1 can be called done.
+- Checksum mismatch expected/actual hashes are exposed in task failure details,
+  but persisting them into structured history/debug records is now a hardening
+  item, not the next product-flow blocker.
 
 ### Release Readiness
 
@@ -150,12 +153,11 @@ adb devices
 
 ## Next Recommended Work
 
-1. Persist checksum mismatch expected/actual hash as structured history/debug
-   metadata.
-2. Add history/details and copy-link UI consumption of persisted package fields.
-3. Expose advanced region/host override behind progressive disclosure.
-4. Run connected instrumentation on API 29 and API 34, and record or document
+1. Expose advanced region/host override behind progressive disclosure.
+2. Run connected instrumentation on API 29 and API 34, and record or document
    API 26 behavior.
-5. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
+3. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
-6. Move user-facing strings into `en` and `zh-rCN` resources.
+4. Move user-facing strings into `en` and `zh-rCN` resources.
+5. Persist checksum mismatch expected/actual hash as structured history/debug
+   metadata during release hardening.
