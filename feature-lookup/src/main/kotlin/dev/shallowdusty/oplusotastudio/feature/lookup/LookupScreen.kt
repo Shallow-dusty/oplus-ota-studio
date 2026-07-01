@@ -323,6 +323,11 @@ private fun PackageFoundContent(
         }
         SummaryRow("MD5", pkg.md5)
         SummaryRow("SHA-256", pkg.sha256)
+        Text(
+            "This app verifies download transfer integrity when hashes are available. It does not verify OPlus package signatures.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         val notes = pkg.releaseNotes
         if (notes != null) {
             Spacer(Modifier.height(8.dp))

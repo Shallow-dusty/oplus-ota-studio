@@ -134,7 +134,7 @@ private fun DownloadRowCard(
             )
             is DownloadState.Retrying -> RetryingContent(s)
             DownloadState.Verifying -> VerifyingContent()
-            DownloadState.Verified -> StateLabel("Verified", color = MaterialTheme.colorScheme.primary)
+            DownloadState.Verified -> VerifiedContent()
             DownloadState.Unverified -> UnverifiedContent()
             DownloadState.Canceled -> StateLabel("Canceled", color = MaterialTheme.colorScheme.onSurfaceVariant)
             is DownloadState.Failed -> FailedContent(s)
@@ -209,6 +209,16 @@ private fun HistoryRowCard(
 }
 
 @Composable
+private fun VerifiedContent() {
+    StateLabel("Transfer verified", color = MaterialTheme.colorScheme.primary)
+    Text(
+        "Hash verification confirms download transfer integrity, not OPlus package signatures.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
 private fun StateLabel(text: String, color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = color, fontWeight = FontWeight.Medium)
 }
@@ -272,7 +282,7 @@ private fun VerifyingContent() {
 private fun UnverifiedContent() {
     StateLabel("Downloaded, not verified", color = MaterialTheme.colorScheme.tertiary)
     Text(
-        "No checksum was provided. Transfer integrity is unknown.",
+        "No checksum was provided. Transfer integrity is unknown, and OPlus package signatures are not verified by this app.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
