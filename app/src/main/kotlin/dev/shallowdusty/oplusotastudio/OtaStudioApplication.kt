@@ -82,7 +82,7 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
     override fun onCreate() {
         super.onCreate()
         applicationScope.launch {
-            graph.cleanOrphanedDownloadParts()
+            graph.runStartupMaintenance()
         }
     }
 

@@ -81,7 +81,7 @@ class AppGraph(
                 admissionGate = downloadAdmissionGate,
             )
         }
-    private val downloadEngineDelegate: DownloadEngine =
+    private val workScheduledDownloadEngine: WorkScheduledDownloadEngine? =
         if (downloadTempRoot != null && downloadTaskStore != null && downloadWorkScheduler != null) {
             WorkScheduledDownloadEngine(
                 taskStore = downloadTaskStore,
@@ -90,8 +90,10 @@ class AppGraph(
                 admissionGate = downloadAdmissionGate,
             )
         } else {
-            realDownloadEngine ?: FakeDownloadEngine()
+            null
         }
+    private val downloadEngineDelegate: DownloadEngine =
+        workScheduledDownloadEngine ?: realDownloadEngine ?: FakeDownloadEngine()
     val downloadEngine: DownloadEngine = LoggingDownloadEngine(
         delegate = downloadEngineDelegate,
         logger = appLogger,
@@ -110,6 +112,11 @@ class AppGraph(
             .first()
             .mapTo(mutableSetOf()) { it.tempFilePath }
         return janitor.deleteOrphanedParts(activeTempFilePaths)
+    }
+
+    suspend fun runStartupMaintenance() {
+        cleanOrphanedDownloadParts()
+        workScheduledDownloadEngine?.rescheduleRecoverableTasks()
     }
 
     companion object {

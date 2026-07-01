@@ -257,6 +257,38 @@ class AppGraphTest {
         assertEquals(listOf(orphanPart.absolutePath), result?.deletedPaths)
     }
 
+    @Test
+    fun `startup maintenance cleans parts and reschedules recoverable downloads`() = runTest {
+        val tempRoot = testTempRoot("app-graph-startup-maintenance")
+        val activePart = tempRoot.resolve("active.zip.part").also { it.writeText("active") }
+        val orphanPart = tempRoot.resolve("orphan.zip.part").also { it.writeText("orphan") }
+        val store = RecordingDownloadTaskStore(
+            observedTasks = listOf(
+                storedTask(
+                    tempFilePath = activePart.path,
+                    state = DownloadState.Running(
+                        downloadedBytes = 2L,
+                        targetSize = 3L,
+                        speedBytesPerSec = null,
+                    ),
+                ),
+            ),
+        )
+        val scheduler = RecordingDownloadTaskWorkScheduler()
+        val graph = AppGraph(
+            downloadTempRoot = tempRoot,
+            downloadTaskStore = store,
+            downloadTempFileJanitor = DownloadTempFileJanitor(listOf(tempRoot)),
+            downloadWorkScheduler = scheduler,
+        )
+
+        graph.runStartupMaintenance()
+
+        assertFalse(orphanPart.exists())
+        assertEquals(listOf("task-1"), scheduler.scheduled)
+        assertEquals(DownloadState.Queued, store.updatedStates.single())
+    }
+
     private class RecordingPackageRepository : PackageRepository {
         override suspend fun record(entry: HistoryEntry) = Unit
 
@@ -306,6 +338,16 @@ class AppGraphTest {
         override fun cancel(taskId: String) = Unit
     }
 
+    private class RecordingDownloadTaskWorkScheduler : DownloadTaskWorkScheduler {
+        val scheduled = mutableListOf<String>()
+
+        override suspend fun schedule(taskId: String) {
+            scheduled += taskId
+        }
+
+        override fun cancel(taskId: String) = Unit
+    }
+
     private class NoOpDownloadWorkerExecutor : DownloadWorkerExecutor {
         override suspend fun execute(taskId: String): DownloadWorkerExecutionResult =
             DownloadWorkerExecutionResult.Failed
@@ -322,7 +364,10 @@ class AppGraphTest {
         return dir
     }
 
-    private fun storedTask(tempFilePath: String): StoredDownloadTask =
+    private fun storedTask(
+        tempFilePath: String,
+        state: DownloadState = DownloadState.Queued,
+    ): StoredDownloadTask =
         StoredDownloadTask(
             taskId = "task-1",
             pkg = OtaPackage(
@@ -338,7 +383,7 @@ class AppGraphTest {
             etag = null,
             lastModified = null,
             acceptRanges = false,
-            state = DownloadState.Queued,
+            state = state,
             updatedAtMs = 100L,
         )
 
@@ -346,6 +391,7 @@ class AppGraphTest {
         private val observedTasks: List<StoredDownloadTask> = emptyList(),
     ) : DownloadTaskStore {
         val created = mutableListOf<String>()
+        val updatedStates = mutableListOf<DownloadState>()
 
         override suspend fun createQueuedTask(
             taskId: String,
@@ -360,7 +406,9 @@ class AppGraphTest {
             taskId: String,
             state: DownloadState,
             updatedAtMs: Long,
-        ) = Unit
+        ) {
+            updatedStates += state
+        }
 
         override suspend fun updateResumeMetadata(
             taskId: String,
