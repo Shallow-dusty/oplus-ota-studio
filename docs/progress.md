@@ -9,7 +9,7 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `d34cf11 fix: parse legacy OTA XML on Android`
+- Latest implementation commit at this snapshot: `016c4ec build: configure private trial release signing`
 - Local connected-device check on 2026-07-01: `adb devices` reported `emulator-5554 device`
 
 ## Current Product Status
@@ -19,9 +19,8 @@ backend wiring for lookup, downloads, storage, logging, diagnostics, and
 WorkManager-backed download execution, but it is not a complete product release
 yet.
 
-The remaining release blockers are mostly evidence and release packaging:
-real device detection evidence, live/captured/replayed OTA lookup evidence,
-and private-trial signing/versioning polish.
+The remaining release blockers are evidence-focused: real device detection
+evidence and live/captured/replayed OTA lookup evidence.
 
 ## Implemented
 
@@ -150,12 +149,18 @@ and private-trial signing/versioning polish.
 ### Release Readiness
 
 - UI tests/screenshot tests for every lookup/download state are not complete.
-- Debug and unsigned release APK assembly passed locally on 2026-07-01 via
-  `:app:assembleDebug :app:assembleRelease`; produced `app-debug.apk` and
-  `app-release-unsigned.apk` with `versionName` `0.0.1`.
+- Debug and release APK assembly passed locally on 2026-07-01 via
+  `:app:assembleDebug :app:assembleRelease`.
+- Private-trial versioning is configured as `versionCode` `10` and
+  `versionName` `0.1.0`.
+- Release signing is configured from explicit Gradle properties or
+  `OPLUS_OTA_STUDIO_RELEASE_*` environment variables. A local smoke build with
+  a temporary throwaway keystore produced `app-release.apk`, and `apksigner
+  verify --print-certs` reported a V2 signer.
 - Release build still has R8 disabled; v0.3 requires R8 release install/run
   evidence.
-- Signed release packaging and v0.1 versioning are not configured yet.
+- Durable private signing material is intentionally not committed; use
+  `docs/release.md` for the local signing workflow.
 - The repository should stay private until v0.3 release-candidate readiness.
 
 ## Verification Snapshot
@@ -175,12 +180,12 @@ Additional checks used during this phase:
 go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/ci.yml
 adb devices
 .\gradlew.bat :app:connectedDebugAndroidTest
+.\gradlew.bat :app:assembleDebug :app:assembleRelease
 ```
 
 ## Next Recommended Work
 
 1. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
-2. Configure private-trial signing/versioning when cutting a v0.1 artifact.
-3. Persist checksum mismatch expected/actual hash as structured history/debug
+2. Persist checksum mismatch expected/actual hash as structured history/debug
    metadata during release hardening.

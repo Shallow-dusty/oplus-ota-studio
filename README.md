@@ -6,9 +6,10 @@ clear status feedback — running entirely on the phone, no root required for th
 normal lookup/download flow.
 
 > **Status:** backend-core in progress. The app now has real lookup, download,
-> storage, WorkManager, logging, diagnostics, and MediaStore promotion wiring.
-> It is not release-complete yet: real-device/live OTA evidence, history/detail
-> polish, localization, and connected instrumentation evidence are still open.
+> storage, WorkManager, logging, diagnostics, MediaStore promotion wiring, and
+> private-trial release signing configuration. It is not release-complete yet:
+> real-device/live OTA evidence and later release-candidate polish are still
+> open.
 > See [`docs/progress.md`](docs/progress.md) for the current progress panel.
 
 ## Project layout
@@ -52,6 +53,10 @@ The Gradle wrapper is pinned to Gradle 9.6.1.
 ./gradlew test               # pure-JVM unit tests
 ./gradlew lintDebug          # Android Lint (CI runs these three)
 ```
+
+Private-trial release signing is documented in
+[`docs/release.md`](docs/release.md). Signing keys and passwords must stay out
+of the repository.
 
 > **detekt deferred.** No stable detekt release supports Kotlin 2.4.0 yet
 > (1.23.8 tops out at Kotlin 2.0.21; 2.0.0-alpha.5 supports 2.4.0 but is a
