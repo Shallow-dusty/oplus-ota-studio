@@ -211,6 +211,28 @@ class DownloadsViewModelTest {
         assertEquals("content://downloads/oplus/cph2581.zip", historyRow.localFilePath)
     }
 
+    @Test
+    fun `download from history enqueues the persisted package`() = runTest {
+        val engine = FakeDownloadEngine()
+        val repository = FakePackageRepository(
+            history = listOf(
+                sampleHistoryEntry(),
+            ),
+        )
+        val vm = DownloadsViewModel(engine, repository)
+        advanceUntilIdle()
+
+        vm.enqueueHistoryPackage("history-1")
+        advanceUntilIdle()
+
+        val pkg = engine.enqueuedPackages.single()
+        assertEquals("CPH2581_15.0.0.840(EX01).zip", pkg.versionName)
+        assertEquals(6_200_000_000L, pkg.sizeBytes)
+        assertEquals("https://otagm.oppo.com/cph2581.zip", pkg.downloadUrl)
+        assertEquals("abc", pkg.md5)
+        assertEquals(OtaEvidenceLevel.LiveVerified, pkg.evidenceLevel)
+    }
+
     private fun samplePackage() = OtaPackage(
         versionName = "12.0.0.0.LE28AA",
         type = "full",
@@ -241,8 +263,10 @@ class DownloadsViewModelTest {
     private class FakeDownloadEngine : DownloadEngine {
         private val tasks = mutableListOf<FakeDownloadTask>()
         private val observedTasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+        val enqueuedPackages = mutableListOf<OtaPackage>()
 
         override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
+            enqueuedPackages.add(pkg)
             val task = FakeDownloadTask()
             tasks.add(task)
             observedTasks.value = tasks.toList()

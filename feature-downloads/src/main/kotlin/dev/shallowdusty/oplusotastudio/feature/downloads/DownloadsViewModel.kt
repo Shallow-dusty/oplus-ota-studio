@@ -6,6 +6,7 @@ import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
+import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +59,7 @@ class DownloadsViewModel(
     private val latest = mutableMapOf<String, DownloadState>()
     private val taskHandles = mutableMapOf<String, DownloadTask>()
     private val stateJobs = mutableMapOf<String, Job>()
+    private val historyEntries = mutableMapOf<String, HistoryEntry>()
 
     init {
         observeQueue()
@@ -104,6 +106,8 @@ class DownloadsViewModel(
         val repository = packageRepository ?: return
         viewModelScope.launch {
             repository.observeHistory().collect { entries ->
+                historyEntries.clear()
+                entries.associateByTo(historyEntries) { it.id }
                 _uiState.value = _uiState.value.copy(
                     historyRows = entries.map { it.toHistoryRow() },
                 )
@@ -125,6 +129,13 @@ class DownloadsViewModel(
         val task = taskHandles[taskId] ?: return
         viewModelScope.launch { task.cancel() }
     }
+
+    fun enqueueHistoryPackage(historyId: String) {
+        val entry = historyEntries[historyId] ?: return
+        viewModelScope.launch {
+            engine.enqueue(entry.toOtaPackage())
+        }
+    }
 }
 
 private fun HistoryEntry.toHistoryRow(): HistoryRow =
@@ -136,4 +147,17 @@ private fun HistoryEntry.toHistoryRow(): HistoryRow =
         downloadUrl = downloadUrl,
         evidenceLabel = evidenceLevel.stableId,
         localFilePath = localFilePath,
+    )
+
+private fun HistoryEntry.toOtaPackage(): OtaPackage =
+    OtaPackage(
+        versionName = packageName,
+        type = null,
+        sizeBytes = packageSize,
+        sourceHost = sourceHost,
+        downloadUrl = downloadUrl,
+        md5 = md5,
+        sha256 = sha256,
+        releaseNotes = releaseNotes,
+        evidenceLevel = evidenceLevel,
     )

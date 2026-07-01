@@ -13,10 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -87,7 +88,10 @@ fun DownloadsScreen(
                         SectionTitle("Package history")
                     }
                     items(state.historyRows, key = { it.id }) { row ->
-                        HistoryRowCard(row)
+                        HistoryRowCard(
+                            row = row,
+                            onDownload = viewModel::enqueueHistoryPackage,
+                        )
                     }
                 }
             }
@@ -139,7 +143,10 @@ private fun DownloadRowCard(
 }
 
 @Composable
-private fun HistoryRowCard(row: HistoryRow) {
+private fun HistoryRowCard(
+    row: HistoryRow,
+    onDownload: (String) -> Unit,
+) {
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
     Column(Modifier.fillMaxWidth()) {
@@ -158,6 +165,12 @@ private fun HistoryRowCard(row: HistoryRow) {
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = { onDownload(row.id) }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.CloudDownload, contentDescription = null)
+            Spacer(Modifier.size(8.dp))
+            Text("Download")
         }
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
