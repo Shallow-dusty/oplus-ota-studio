@@ -10,7 +10,8 @@ truth remains
 
 - Branch: `feat/backend-core`
 - Latest implementation commit at this snapshot: `016c4ec build: configure private trial release signing`
-- Local connected-device check on 2026-07-01: `adb devices` reported `emulator-5554 device`
+- Local connected-device check on 2026-07-01 after emulator shutdown:
+  `adb devices` reported no attached devices.
 
 ## Current Product Status
 
@@ -132,9 +133,11 @@ evidence and live/captured/replayed OTA lookup evidence.
   storage promotion behavior, plus an API 34 controlled end-to-end download
   smoke through parser, engine, checksum verification, and MediaStore promotion.
 - No committed `captured-real-*` or `replayed-real-profile-*` successful OTA
-  response fixture exists yet; a local 2026-07-01 replay attempt against
+  response fixture exists yet; local 2026-07-01 replay attempts against
   `otacn.oppo.com/OnePlusOTA/OnePlus_OTA.php` did not complete the TLS/HTTP
-  handshake from this Windows host.
+  handshake from this machine. Windows `curl.exe` failed with Schannel
+  `failed to receive handshake`; WSL `curl` failed with OpenSSL
+  `SSL_ERROR_SYSCALL`.
 - The ColorOS component parser is synthetic-schema coverage, not proof of a live
   server chain.
 - v0.2 still requires at least one live-endpoint verified region if v0.1 ships
