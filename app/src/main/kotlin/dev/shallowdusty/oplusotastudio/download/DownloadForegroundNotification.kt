@@ -7,6 +7,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
+import dev.shallowdusty.oplusotastudio.R
 
 object DownloadForegroundNotification {
     const val ChannelId = "download_progress"
@@ -20,7 +21,7 @@ class DownloadForegroundInfoFactory(
         ensureChannel()
         val notification = NotificationCompat.Builder(context, DownloadForegroundNotification.ChannelId)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("Downloading OTA package")
+            .setContentTitle(context.getString(R.string.download_notification_title))
             .setContentText(taskId)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -44,7 +45,7 @@ class DownloadForegroundInfoFactory(
         manager.createNotificationChannel(
             NotificationChannel(
                 DownloadForegroundNotification.ChannelId,
-                "OTA downloads",
+                context.getString(R.string.download_notification_channel),
                 NotificationManager.IMPORTANCE_LOW,
             ),
         )
