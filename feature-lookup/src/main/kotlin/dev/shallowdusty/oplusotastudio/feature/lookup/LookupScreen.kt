@@ -67,6 +67,7 @@ fun LookupScreen(
                 LookupUiState.Querying -> QueryingContent()
                 is LookupUiState.PackageFound -> PackageFoundContent(
                     pkg = s.pkg,
+                    liveLookupExperimental = s.liveLookupExperimental,
                     onDownload = viewModel::enqueueDownload,
                     onReset = viewModel::reset,
                 )
@@ -209,6 +210,7 @@ private fun SummaryRow(label: String, value: String?) {
 @Composable
 private fun PackageFoundContent(
     pkg: dev.shallowdusty.oplusotastudio.core.model.OtaPackage,
+    liveLookupExperimental: Boolean,
     onDownload: (dev.shallowdusty.oplusotastudio.core.model.OtaPackage) -> Unit,
     onReset: () -> Unit,
 ) {
@@ -221,6 +223,14 @@ private fun PackageFoundContent(
         SummaryRow("Type", pkg.type)
         SummaryRow("Size", formatBytes(pkg.sizeBytes))
         SummaryRow("Source", pkg.sourceHost)
+        SummaryRow("Evidence", pkg.evidenceLevel.stableId)
+        if (liveLookupExperimental) {
+            Text(
+                "Live lookup support is experimental until this chain is live-verified.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         SummaryRow("MD5", pkg.md5)
         SummaryRow("SHA-256", pkg.sha256)
         val notes = pkg.releaseNotes

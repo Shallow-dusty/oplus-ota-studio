@@ -6,6 +6,7 @@ import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTask
 import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
+import dev.shallowdusty.oplusotastudio.core.model.OtaEvidenceLevel
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
@@ -67,6 +68,36 @@ class LookupViewModelTest {
         vm.lookup()
         advanceUntilIdle()
         assertEquals(LookupUiState.PackageFound(pkg), vm.uiState.value)
+    }
+
+    @Test
+    fun `synthetic package result marks live lookup experimental`() = runTest {
+        val pkg = samplePackage()
+        val vm = LookupViewModel(
+            deviceDetector = FakeDeviceDetector(completeProfile()),
+            lookupService = FakeLookupService(OtaLookupResult.PackageFound(pkg)),
+        )
+
+        vm.lookup()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as LookupUiState.PackageFound
+        assertEquals(true, state.liveLookupExperimental)
+    }
+
+    @Test
+    fun `live verified package result does not mark live lookup experimental`() = runTest {
+        val pkg = samplePackage().copy(evidenceLevel = OtaEvidenceLevel.LiveVerified)
+        val vm = LookupViewModel(
+            deviceDetector = FakeDeviceDetector(completeProfile()),
+            lookupService = FakeLookupService(OtaLookupResult.PackageFound(pkg)),
+        )
+
+        vm.lookup()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as LookupUiState.PackageFound
+        assertEquals(false, state.liveLookupExperimental)
     }
 
     @Test

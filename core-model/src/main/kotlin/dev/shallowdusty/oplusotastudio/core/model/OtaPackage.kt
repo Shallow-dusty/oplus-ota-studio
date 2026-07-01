@@ -6,6 +6,9 @@ package dev.shallowdusty.oplusotastudio.core.model
  *
  * Hashes are nullable because the server may provide neither (spec §4.1 — the
  * package is then marked `unverified` and the UI warns explicitly).
+ *
+ * [evidenceLevel] defaults to [OtaEvidenceLevel.Synthetic] so generated
+ * fixtures and fakes never imply live server verification by accident.
  */
 data class OtaPackage(
     val versionName: String,
@@ -17,4 +20,5 @@ data class OtaPackage(
     val md5: String? = null,
     val sha256: String? = null,
     val releaseNotes: String? = null,
+    val evidenceLevel: OtaEvidenceLevel = OtaEvidenceLevel.Synthetic,
 )

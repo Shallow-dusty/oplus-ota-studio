@@ -39,7 +39,10 @@ sealed interface LookupUiState {
     data object Querying : LookupUiState
 
     /** A package was found. */
-    data class PackageFound(val pkg: OtaPackage) : LookupUiState
+    data class PackageFound(
+        val pkg: OtaPackage,
+        val liveLookupExperimental: Boolean = pkg.evidenceLevel.requiresExperimentalDisclosure,
+    ) : LookupUiState
 
     /** First lookup requires explicit consent before sending build info. */
     data class PrivacyDisclosureRequired(val profile: OtaProfile, val device: DeviceProfile?) : LookupUiState
