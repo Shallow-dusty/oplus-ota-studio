@@ -283,6 +283,20 @@ class SimpleDownloadEngine(
                     ?: response.header("Content-Length")?.toLongOrNull()
                 val appendPartial = rangeStart != null && response.code == 206
                 if (rangeStart != null && !appendPartial) {
+                    updateState(
+                        DownloadState.Failed(
+                            category = OtaErrorCategory.Server,
+                            retriesRemaining = maxAttempts - 1,
+                            raw = "Server ignored resume range, restarting download from zero",
+                        ),
+                    )
+                    updateState(
+                        DownloadState.Retrying(
+                            attempt = 1,
+                            maxAttempts = maxAttempts,
+                            category = OtaErrorCategory.Server,
+                        ),
+                    )
                     tempFile.delete()
                 }
                 var downloaded = if (appendPartial) rangeStart else 0L

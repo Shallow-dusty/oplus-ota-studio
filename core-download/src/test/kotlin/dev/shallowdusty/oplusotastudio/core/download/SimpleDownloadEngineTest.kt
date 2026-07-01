@@ -918,6 +918,13 @@ class SimpleDownloadEngineTest {
 
         assertEquals("bytes=2-", server.takeRequest().headers["Range"])
         assertEquals("abc", tempFile.readText())
+        assertTrue(
+            store.updates.any { update ->
+                val failed = update.state as? DownloadState.Failed
+                failed?.category == OtaErrorCategory.Server &&
+                    failed.raw == "Server ignored resume range, restarting download from zero"
+            },
+        )
     }
 
     @Test
