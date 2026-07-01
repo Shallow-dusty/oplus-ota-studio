@@ -157,6 +157,11 @@ evidence and live/captured/replayed OTA lookup evidence.
 
 - Lookup and download state presentation have focused JVM coverage, but
   screenshot tests are still not complete.
+- API 34 Compose UI render evidence now covers selected lookup package-found
+  and error states plus all core download state labels, with nonblank root image
+  capture checks. This is device-backed render coverage, not final golden image
+  comparison or public screenshot review. Details:
+  `docs/evidence/instrumentation/ui-state-render-api34-2026-07-01.txt`.
 - Debug and release APK assembly passed locally on 2026-07-01.
 - Private-trial versioning is configured as `versionCode` `10` and
   `versionName` `0.1.0`.
