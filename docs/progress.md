@@ -9,7 +9,7 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `016c4ec build: configure private trial release signing`
+- Latest implementation commit at this snapshot: `a438e67 feat: persist checksum mismatch hashes`
 - Local connected-device check on 2026-07-01 after emulator shutdown:
   `adb devices` reported no attached devices.
 
@@ -56,6 +56,8 @@ evidence and live/captured/replayed OTA lookup evidence.
 - `SimpleDownloadEngine` streams to `.zip.part`, throttles progress, emits
   speed, verifies checksum, promotes verified/unverified files, quarantines
   checksum mismatches as `.zip.bad`, and persists state before UI notification.
+- Checksum mismatch failures now persist expected/actual hashes as structured
+  fields on both download task state and the latest matching history row.
 - An app-level controlled smoke test parses a synthetic legacy OTA success
   fixture, downloads its package from `MockWebServer`, verifies MD5, and promotes
   the final ZIP through the real download engine.
@@ -72,9 +74,11 @@ evidence and live/captured/replayed OTA lookup evidence.
 ### Storage And History
 
 - Room stores download task state and history.
-- Database schema is at version 3 with migrations `1 -> 2` and `2 -> 3`.
+- Database schema is at version 4 with migrations `1 -> 2`, `2 -> 3`, and
+  `3 -> 4`.
 - History now persists package metadata needed for later details/copy-link flows:
-  source host, download URL, checksums, release notes, and evidence level.
+  source host, download URL, checksums, release notes, evidence level, and
+  checksum mismatch diagnostics.
 - Downloads now surfaces lookup history, copy-link/copy-path actions, and a
   direct download action that reuses the persisted package metadata.
 - Starting a package download from lookup now opens the downloads screen so the
@@ -143,12 +147,6 @@ evidence and live/captured/replayed OTA lookup evidence.
 - v0.2 still requires at least one live-endpoint verified region if v0.1 ships
   on fixture-backed evidence.
 
-### Download/Product Flow
-
-- Checksum mismatch expected/actual hashes are exposed in task failure details,
-  but persisting them into structured history/debug records is now a hardening
-  item, not the next product-flow blocker.
-
 ### Release Readiness
 
 - UI tests/screenshot tests for every lookup/download state are not complete.
@@ -190,5 +188,3 @@ adb devices
 
 1. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
    lookup clearly experimental until live verification is possible.
-2. Persist checksum mismatch expected/actual hash as structured history/debug
-   metadata during release hardening.
