@@ -5,11 +5,11 @@ profile setup, package lookup, resumable download, integrity verification, and
 clear status feedback — running entirely on the phone, no root required for the
 normal lookup/download flow.
 
-> **Status:** backend-core in progress. The app now has real lookup, download,
-> storage, WorkManager, logging, diagnostics, MediaStore promotion wiring, and
-> private-trial release signing configuration. It is not release-complete yet:
-> real-device/live OTA evidence and later release-candidate polish are still
-> open.
+> **Status:** private-trial v0.1 convergence. The app now has real lookup,
+> download, storage, WorkManager, logging, diagnostics, MediaStore promotion
+> wiring, private-trial release signing configuration, and physical OnePlus 9
+> Pro CN live ColorOS replay evidence. It is not public-release complete yet:
+> final release smoke and claim cleanup are still open.
 > See [`docs/progress.md`](docs/progress.md) for the current progress panel.
 
 ## Project layout
@@ -31,7 +31,7 @@ strictly one-way (lower layers never depend on higher layers):
 `DownloadEngine`, `DeviceDetector`, `PackageRepository`); feature modules depend
 only on those interfaces, and `app` injects the implementation. Normal app
 startup now uses real Room/DataStore, WorkManager, MediaStore promotion,
-logging, diagnostics, device detection, and legacy OTA lookup wiring.
+logging, diagnostics, device detection, and ColorOS component OTA lookup wiring.
 `AppGraph` still keeps fake defaults for tests and non-Application construction.
 
 ## Design spec

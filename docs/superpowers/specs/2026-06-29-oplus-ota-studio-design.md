@@ -93,13 +93,20 @@ OPlus services have shipped both a legacy XML/form style (OnePlus lineage) and a
 
 **Style B — OPlus JSON (ColorOS):**
 
-- Method: `POST`
-- Path: ❓ confirm
-- Headers: `Content-Type: application/json`
-- Body fields (❓ confirm names):
-  - `model`, `region`, `romVersion`, `otaVersion`, `androidVersion`
-- Response: JSON
-  - `data.url`, `data.size`, `data.md5`, `data.versionName` (❓ shape)
+- Method: `POST` ✅
+- Verified CN endpoint: `https://component-otapc-cn.allawntech.com/update/v3` ✅
+- Headers: `Content-Type: application/json`, `version: 2`,
+  `protectedKey`, plus model/build/region/language/device hint headers ✅
+- Body shape: JSON root with encrypted `params`; decrypted payload includes
+  `model`, `productName`, `romVersion`, `otaVersion`, `androidVersion`,
+  `colorOSVersion`, `uRegion`, `trackRegion`, `deviceId`, and `otaPrefix` ✅
+  for the OnePlus 9 Pro CN replay profile. `nvCarrier` is sent as a request
+  header in the verified chain.
+- Response shape: JSON root with `responseCode` and encrypted `body`;
+  decrypted body contains `components[0].componentPackets.url`,
+  `components[0].componentPackets.size`,
+  `components[0].componentPackets.md5`, and root `versionName` ✅ for the
+  OnePlus 9 Pro CN replay profile.
 
 ### 1.3 Response Model
 

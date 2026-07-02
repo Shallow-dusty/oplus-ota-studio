@@ -10,19 +10,21 @@ truth remains
 
 - Branch: `feat/backend-core`
 - Latest implementation commit at this snapshot:
-  `b400c8e docs: record UI state render evidence`
+  `20120bd feat(app): wire live ColorOS OTA lookup`
 - Local connected-device check on 2026-07-02:
-  `adb devices` reported no attached devices.
+  `adb devices -l` reported a physical OnePlus 9 Pro CN device
+  (`model: LE2120`, serial redacted).
 
 ## Current Product Status
 
 The project has moved beyond the original v0.0 UI shell. The app now has real
 backend wiring for lookup, downloads, storage, logging, diagnostics, and
-WorkManager-backed download execution, but it is not a complete product release
-yet.
+WorkManager-backed download execution. It now also has physical-device ColorOS
+component OTA replay evidence for OnePlus 9 Pro CN.
 
-The remaining release blockers are evidence-focused: real device detection
-evidence and live/captured/replayed OTA lookup evidence.
+The remaining release blockers are release-focused: rerun private-trial release
+smoke after the latest code change and complete final claim cleanup. Public
+release readiness is still out of scope.
 
 ## Implemented
 
@@ -30,7 +32,7 @@ evidence and live/captured/replayed OTA lookup evidence.
 
 - `OtaStudioApplication` wires Room, DataStore, MediaStore promotion,
   WorkManager scheduling, battery/storage admission gates, logging, diagnostics,
-  and the real legacy OTA lookup service into `AppGraph`.
+  and the real ColorOS component OTA lookup service into `AppGraph`.
 - `AppGraph` still has fake defaults for tests or non-Application construction,
   but normal app startup injects real storage/download/logging components.
 
@@ -38,6 +40,9 @@ evidence and live/captured/replayed OTA lookup evidence.
 
 - `AndroidDeviceDetector` uses Android `Build.*`, best-effort system property
   reads, display-build parsing, region inference, and an incomplete-profile path.
+- Device detection now carries optional ColorOS request hints into `OtaProfile`:
+  `ro.build.oplus_nv_id`, runtime Android ID, and device language. The raw
+  Android ID is read at runtime and is not committed in tests or evidence.
 - `OtaProfile` supports manual host override validation.
 - Lookup is blocked when the profile lacks required fields.
 
@@ -45,12 +50,20 @@ evidence and live/captured/replayed OTA lookup evidence.
 
 - `core-ota` has host resolution, legacy XML/form request construction,
   `OkHttpOtaTransport`, stable error mapping, and parser tests.
-- JSON/ColorOS support exists as a disabled strategy plus a decrypted component
-  payload parser backed by a synthetic fixture.
+- The normal app lookup path now uses the ColorOS component OTA v3 endpoint via
+  `ColorOsOtaLookupService`, including AES/CTR request encryption, RSA
+  protected-key negotiation, and decrypted component response parsing.
 - `OtaEvidenceLevel` marks package provenance as `synthetic`,
   `captured-real`, `replayed-real-profile`, or `live-verified`.
 - Lookup UI state surfaces experimental disclosure when a package is not
   `live-verified`.
+- Physical OnePlus 9 Pro CN evidence on 2026-07-02:
+  `LiveColorOsOtaLookupInstrumentedTest.queriesOnePlus9ProCnColorOsEndpoint`
+  passed on a real `LE2120` device against
+  `https://component-otapc-cn.allawntech.com/update/v3`, returning
+  `LE2120_14.0.0.1901(CN01)` with size `6559817109` and MD5
+  `5ae1e4d8101218d58c1da10092b22996`. Details:
+  `docs/evidence/ota/live-coloros-oneplus9pro-cn-2026-07-02.txt`.
 - Lookup state presentation now has focused JVM coverage for detecting,
   incomplete profile, privacy disclosure, querying, package found, no update,
   and network/server/malformed error copy.
@@ -137,24 +150,26 @@ evidence and live/captured/replayed OTA lookup evidence.
 
 ### Evidence And Real-World Validation
 
-- No real device is currently attached locally, so device detection, live
-  lookup, and MediaStore flows have not been locally run on a physical
-  OnePlus/OPlus device in this snapshot.
+- A physical OnePlus 9 Pro CN debug install, launch smoke, and guarded live
+  ColorOS OTA replay lookup passed locally on 2026-07-02. The successful lookup
+  is `replayed-real-profile` evidence because it uses a known spoofed OTA build
+  string, not a pure current-build update check.
 - Local emulator validation now covers API 26, API 29, API 30, and API 34
   storage promotion behavior, plus an API 34 controlled end-to-end download
   smoke through parser, engine, checksum verification, and MediaStore promotion.
-- No committed `captured-real-*` or `replayed-real-profile-*` successful OTA
-  response fixture exists yet; local 2026-07-01 and 2026-07-02 replay attempts against
+- No committed `captured-real-*` or raw `replayed-real-profile-*` successful OTA
+  response fixture exists yet. Local 2026-07-01 and 2026-07-02 replay attempts against
   `otacn.oppo.com/OnePlusOTA/OnePlus_OTA.php` did not complete the TLS/HTTP
   handshake from this machine. Windows `curl.exe` failed with Schannel
   `failed to receive handshake`; WSL `curl` failed with OpenSSL
   `SSL_ERROR_SYSCALL`.
-  The latest evidence log is
+  The legacy replay failure log is
   `docs/evidence/ota/live-replay-attempt-2026-07-02.txt`.
-- The ColorOS component parser is synthetic-schema coverage, not proof of a live
-  server chain.
-- v0.2 still requires at least one live-endpoint verified region if v0.1 ships
-  on fixture-backed evidence.
+- The ColorOS component endpoint chain is now proven by guarded phone-side
+  instrumentation. No raw server response fixture is committed because the live
+  response contains signed CDN package URLs.
+- v0.2 should still add broader live coverage for other regions/models and a
+  pure current-build no-update/update check.
 
 ### Release Readiness
 
@@ -204,6 +219,10 @@ Additional checks used during this phase:
 go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/ci.yml
 adb devices
 .\gradlew.bat :app:connectedDebugAndroidTest
+.\gradlew.bat :core-model:testDebugUnitTest :core-ota:testDebugUnitTest :feature-lookup:testDebugUnitTest :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+adb install -r -t app\build\outputs\apk\debug\app-debug.apk
+adb install -r -t app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+adb shell am instrument -w -r -e class dev.shallowdusty.oplusotastudio.ota.LiveColorOsOtaLookupInstrumentedTest -e liveOta true -e model LE2120 -e deviceCodename OnePlus9Pro_CH -e otaVersion LE2120_11.H.23_0001_000000000001 -e nvCarrier 10010111 -e language zh-Hans-CN dev.shallowdusty.oplusotastudio.test/androidx.test.runner.AndroidJUnitRunner
 .\gradlew.bat :app:assembleDebug :app:assembleRelease
 .\gradlew.bat :app:assembleRelease
 adb install -r app\build\outputs\apk\release\app-release.apk
@@ -217,9 +236,10 @@ as the active finish plan.
 
 1. Stop expanding backend internals unless real-device or release validation
    exposes a concrete blocking bug.
-2. Attach a physical OnePlus/OPlus device and collect the first captured-real,
-   replayed-real-profile, or live-verified OTA lookup evidence.
-3. If no physical device is available, keep lookup clearly experimental and cut
-   only a private-trial build with explicit limitations.
-4. Rerun release smoke after any further code change; do not claim public
-   release readiness without real-device/live OTA evidence.
+2. Rerun private-trial release build/sign/install/launch smoke after the
+   ColorOS lookup code change.
+3. Run the final claim audit against README, docs, and user-facing strings.
+4. Keep lookup experimental for public claims unless/until more live coverage is
+   added beyond the OnePlus 9 Pro CN replay profile.
+5. Do not claim public release readiness until release smoke, claim audit, and
+   broader model/region confidence are complete.

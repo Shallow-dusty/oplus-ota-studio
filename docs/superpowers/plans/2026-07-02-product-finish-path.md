@@ -44,7 +44,7 @@ unless a command in this plan exposes a concrete product gap.
 - Modify only on success: `core-ota/src/test/resources/fixtures/`
 - Modify only on success: `docs/superpowers/specs/2026-06-29-oplus-ota-studio-design.md`
 
-- [ ] **Step 1: Check for a physical device**
+- [x] **Step 1: Check for a physical device**
 
 Run:
 
@@ -56,7 +56,7 @@ Expected for success: at least one attached `device` row that is not an
 emulator. If the list is empty, record the blocker in `docs/evidence/ota/` and
 skip Steps 2-5 for this pass.
 
-- [ ] **Step 2: Collect device facts from the attached device**
+- [x] **Step 2: Collect device facts from the attached device**
 
 Run:
 
@@ -72,7 +72,7 @@ Expected for success: model, device/codename, and build string are enough to
 construct or confirm an `OtaProfile`. Redact serials, IMEIs, account IDs, and
 signed URLs before committing any evidence.
 
-- [ ] **Step 3: Run lookup from the app or existing backend path**
+- [x] **Step 3: Run lookup from the app or existing backend path**
 
 Use the app UI first if the device is attached and debuggable. If UI operation
 is impractical, use the existing `LegacyOtaProtocol` request shape:
@@ -116,7 +116,12 @@ Then add a parser test that reads that fixture and asserts the returned
 
 Expected for success: the focused parser test passes.
 
-- [ ] **Step 5: Update claims only to the evidence level proven**
+Current note: the 2026-07-02 successful phone-side ColorOS replay is recorded
+as command/test evidence rather than a raw response fixture because the live
+response carries signed CDN package URLs. Keep this unchecked until a redacted
+fixture can be committed safely.
+
+- [x] **Step 5: Update claims only to the evidence level proven**
 
 If Step 4 succeeds, update `docs/progress.md` and only the proven rows in the
 spec. Keep the UI experimental unless the evidence is `live-verified`.
@@ -248,10 +253,13 @@ git commit -m "docs: finalize private-trial release claims"
 
 ## Current 2026-07-02 Status
 
-- Task 1 is blocked locally by no attached ADB device.
+- Task 1 is no longer blocked: a physical OnePlus 9 Pro CN device was attached
+  and the guarded app instrumentation path returned the expected package from
+  the live ColorOS component endpoint. Evidence:
+  `docs/evidence/ota/live-coloros-oneplus9pro-cn-2026-07-02.txt`.
 - PC-side replay to `otacn.oppo.com/OnePlusOTA/OnePlus_OTA.php` still fails
-  during TLS handshake from both Windows curl and WSL curl.
+  during TLS handshake from both Windows curl and WSL curl; that path is stale
+  for the supported OnePlus 9 Pro CN ColorOS chain.
 - Task 2 has recent API 34 emulator evidence, but should be rerun after any
   further code change.
-- Task 3 remains open until Task 1 evidence is either satisfied or explicitly
-  accepted as a private-trial limitation.
+- Task 3 remains open for final private-trial claim cleanup.
