@@ -26,6 +26,16 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import okhttp3.Headers
 import okhttp3.OkHttpClient
+import okhttp3.MediaType
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
+import okio.BufferedSource
+import okio.Source
+import okio.Timeout
+import okio.buffer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -93,6 +103,44 @@ class SimpleDownloadEngineTest {
 
         assertEquals(DownloadState.Unverified, finalState)
         assertEquals(DownloadState.Unverified, store.updates.last().state)
+    }
+
+    @Test
+    fun `short download without checksum fails when package size is known`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "ab"))
+        server.start()
+        val tempRoot = testTempRoot("short-unverified")
+        val store = RecordingDownloadTaskStore()
+        val promoter = RecordingDownloadFilePromoter(
+            finalPath = tempRoot.resolve("final.zip").path,
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            filePromoter = promoter,
+            maxAttempts = 1,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = null,
+            ),
+        )
+
+        val finalState = withTimeout(5.seconds) {
+            task.state.first { it is DownloadState.Failed || it == DownloadState.Unverified }
+        }
+
+        val failed = finalState as DownloadState.Failed
+        assertEquals(OtaErrorCategory.Network, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertTrue(failed.raw?.contains("Incomplete download") == true)
+        assertTrue(promoter.promotions.isEmpty())
+        assertTrue(store.finalPaths.isEmpty())
+        assertFalse(store.updates.any { it.state == DownloadState.Unverified })
     }
 
     @Test
@@ -490,6 +538,62 @@ class SimpleDownloadEngineTest {
             },
         )
         assertEquals(DownloadState.Verified, store.updates.last().state)
+    }
+
+    @Test
+    fun `retry resumes from persisted metadata after partial transfer failure`() = runTest {
+        val requestRanges = mutableListOf<String?>()
+        var requestCount = 0
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                requestCount += 1
+                val request = chain.request()
+                val range = request.header("Range")
+                requestRanges += range
+                val responseCode = if (range == "bytes=2-") 206 else 200
+                val responseBody = when (requestCount) {
+                    1 -> FailingResponseBody(bytesBeforeFailure = "ab", declaredLength = 3L)
+                    else -> if (range == "bytes=2-") "c".toResponseBody() else "abc".toResponseBody()
+                }
+                Response.Builder()
+                    .request(request)
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(responseCode)
+                    .message("OK")
+                    .header("Accept-Ranges", "bytes")
+                    .header("ETag", "\"abc\"")
+                    .body(responseBody)
+                    .build()
+            }
+            .build()
+        val tempRoot = testTempRoot("retry-resume-metadata")
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = client,
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            retryDelay = {},
+        )
+
+        val task = engine.enqueue(
+            OtaPackage(
+                versionName = "test",
+                type = "full",
+                sizeBytes = 3L,
+                sourceHost = "example.test",
+                downloadUrl = "https://example.test/pkg.zip",
+                md5 = "900150983cd24fb0d6963f7d28e17f72",
+            ),
+        )
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Verified }
+        }
+
+        assertEquals(listOf(null, "bytes=2-"), requestRanges)
+        assertEquals("abc", tempRoot.resolve("${task.taskId}.zip.part").readText())
+        assertEquals(true, store.resumeMetadata.last().acceptRanges)
     }
 
     @Test
@@ -1288,6 +1392,38 @@ class SimpleDownloadEngineTest {
             sourceFile: File,
         ): PromotedDownloadFile {
             throw error
+        }
+    }
+
+    private class FailingResponseBody(
+        private val bytesBeforeFailure: String,
+        private val declaredLength: Long,
+    ) : ResponseBody() {
+        override fun contentType(): MediaType? = null
+
+        override fun contentLength(): Long = declaredLength
+
+        override fun source(): BufferedSource {
+            val source = object : Source {
+                private val bytes = Buffer().writeUtf8(bytesBeforeFailure)
+                private var failed = false
+
+                override fun read(sink: Buffer, byteCount: Long): Long {
+                    if (bytes.size > 0L) {
+                        return bytes.read(sink, byteCount)
+                    }
+                    if (!failed) {
+                        failed = true
+                        throw IOException("network dropped mid-body")
+                    }
+                    return -1L
+                }
+
+                override fun timeout(): Timeout = Timeout.NONE
+
+                override fun close() = Unit
+            }
+            return source.buffer()
         }
     }
 

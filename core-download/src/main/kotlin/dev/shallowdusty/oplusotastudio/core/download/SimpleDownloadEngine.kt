@@ -147,6 +147,13 @@ class SimpleDownloadEngine(
         private var pauseRequested = false
         @Volatile
         private var stopRequested = false
+        private var resumeMetadata = storedTask?.let {
+            StoredResumeMetadata(
+                etag = it.etag,
+                lastModified = it.lastModified,
+                acceptRanges = it.acceptRanges,
+            )
+        }
 
         fun start() {
             pauseRequested = false
@@ -235,7 +242,7 @@ class SimpleDownloadEngine(
         }
 
         private suspend fun runDownloadAttempt(): DownloadAttemptOutcome {
-            val resumePlan = storedTask?.resumePlan(tempFile)
+            val resumePlan = currentResumePlan()
             if (resumePlan?.discardPartial == true) {
                 tempFile.delete()
             }
@@ -265,7 +272,7 @@ class SimpleDownloadEngine(
             if (
                 rangeStart != null &&
                 response.code == 206 &&
-                storedTask?.validatorsChanged(response) == true
+                resumeMetadata?.validatorsChanged(response) == true
             ) {
                 response.close()
                 updateState(
@@ -286,6 +293,8 @@ class SimpleDownloadEngine(
                 rangeStart = null
                 response = executeRequest(rangeStart)
             }
+            var targetSize: Long? = null
+            var downloaded = 0L
             response.use {
                 if (!response.isSuccessful) {
                     return DownloadAttemptOutcome.Failed(
@@ -294,16 +303,22 @@ class SimpleDownloadEngine(
                     )
                 }
 
-                taskStore?.updateResumeMetadata(
-                    taskId = taskId,
+                val responseResumeMetadata = StoredResumeMetadata(
                     etag = response.header("ETag"),
                     lastModified = response.header("Last-Modified"),
                     acceptRanges = response.header("Accept-Ranges")
                         ?.equals("bytes", ignoreCase = true) == true,
+                )
+                taskStore?.updateResumeMetadata(
+                    taskId = taskId,
+                    etag = responseResumeMetadata.etag,
+                    lastModified = responseResumeMetadata.lastModified,
+                    acceptRanges = responseResumeMetadata.acceptRanges,
                     updatedAtMs = nowMs(),
                 )
+                resumeMetadata = responseResumeMetadata
 
-                val targetSize = pkg.sizeBytes.takeIf { it > 0 }
+                targetSize = pkg.sizeBytes.takeIf { it > 0 }
                     ?: response.header("Content-Length")?.toLongOrNull()
                 val appendPartial = rangeStart != null && response.code == 206
                 if (rangeStart != null && !appendPartial) {
@@ -323,7 +338,7 @@ class SimpleDownloadEngine(
                     )
                     tempFile.delete()
                 }
-                var downloaded = if (appendPartial) rangeStart else 0L
+                downloaded = if (appendPartial) rangeStart else 0L
                 updateState(DownloadState.Running(downloaded, targetSize, null))
                 var lastProgressUpdateBytes = downloaded
                 var lastProgressUpdateAtMs = nowMs()
@@ -367,6 +382,14 @@ class SimpleDownloadEngine(
             }
 
             if (isUserStopped()) return DownloadAttemptOutcome.Finished
+            targetSize?.let { expectedSize ->
+                if (downloaded < expectedSize) {
+                    return DownloadAttemptOutcome.Failed(
+                        category = OtaErrorCategory.Network,
+                        raw = "Incomplete download: expected $expectedSize bytes, got $downloaded",
+                    )
+                }
+            }
             updateState(DownloadState.Verifying)
             when (
                 val result = checksumVerifier.verify(
@@ -529,28 +552,29 @@ class SimpleDownloadEngine(
             return requestBuilder.build()
         }
 
-        private fun StoredDownloadTask.resumePlan(tempFile: File): ResumeRequestPlan? {
+        private fun currentResumePlan(): ResumeRequestPlan? {
+            val metadata = resumeMetadata ?: return null
             if (!tempFile.exists() || tempFile.length() <= 0L) return null
-            val downloadedBytes = when (val current = state) {
+            val downloadedBytes = when (val current = _state.value) {
                 is DownloadState.Running -> current.downloadedBytes
                 else -> tempFile.length()
             }
             return resumeRequestPlanner.plan(
                 stored = ResumeSnapshot(
-                    acceptRanges = acceptRanges,
+                    acceptRanges = metadata.acceptRanges,
                     downloadedBytes = downloadedBytes,
                     partFileBytes = tempFile.length(),
-                    etag = etag,
-                    lastModified = lastModified,
+                    etag = metadata.etag,
+                    lastModified = metadata.lastModified,
                 ),
                 current = ResumeValidators(
-                    etag = etag,
-                    lastModified = lastModified,
+                    etag = metadata.etag,
+                    lastModified = metadata.lastModified,
                 ),
             )
         }
 
-        private fun StoredDownloadTask.validatorsChanged(response: Response): Boolean {
+        private fun StoredResumeMetadata.validatorsChanged(response: Response): Boolean {
             val responseEtag = response.header("ETag")
             val responseLastModified = response.header("Last-Modified")
             val etagChanged = etag != null &&
@@ -606,6 +630,12 @@ class SimpleDownloadEngine(
                 .coerceAtMost(MaxRetryDelayMs)
     }
 }
+
+private data class StoredResumeMetadata(
+    val etag: String?,
+    val lastModified: String?,
+    val acceptRanges: Boolean,
+)
 
 private class RejectedDownloadTask(
     override val taskId: String,
