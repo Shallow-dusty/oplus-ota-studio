@@ -455,11 +455,16 @@ class SimpleDownloadEngineTest {
         server.enqueue(MockResponse(code = 200, body = "abc"))
         server.start()
         val store = RecordingDownloadTaskStore()
+        val retryDelays = mutableListOf<Int>()
         val engine = SimpleDownloadEngine(
             client = OkHttpClient(),
             tempRoot = testTempRoot("server-retry"),
             scope = backgroundScope,
             taskStore = store,
+            retryDelay = { attempt ->
+                retryDelays += attempt
+                assertEquals(1, server.requestCount)
+            },
         )
 
         val task = engine.enqueue(
@@ -474,6 +479,7 @@ class SimpleDownloadEngineTest {
         }
 
         assertEquals(2, server.requestCount)
+        assertEquals(listOf(1), retryDelays)
         assertTrue(
             store.updates.any {
                 it.state == DownloadState.Retrying(

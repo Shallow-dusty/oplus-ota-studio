@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +45,9 @@ class SimpleDownloadEngine(
     private val storagePreflight: DownloadStoragePreflight = DownloadStoragePreflight(),
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
     private val maxAttempts: Int = 3,
+    private val retryDelay: suspend (failedAttempts: Int) -> Unit = { failedAttempts ->
+        delay(defaultRetryDelayMillis(failedAttempts))
+    },
     private val maxQueuedTasks: Int = DefaultMaxQueuedTasks,
     private val admissionGate: DownloadAdmissionGate = DownloadAdmissionGate.AllowAll,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
@@ -468,6 +472,7 @@ class SimpleDownloadEngine(
                     category = outcome.category,
                 ),
             )
+            retryDelay(failedAttempts)
             return true
         }
 
@@ -593,6 +598,12 @@ class SimpleDownloadEngine(
         const val DefaultMaxQueuedTasks = 20
         const val ProgressUpdateMinBytes = 1024L * 1024L
         const val ProgressUpdateMinIntervalMs = 250L
+        const val DefaultRetryDelayMs = 5_000L
+        const val MaxRetryDelayMs = 30_000L
+
+        fun defaultRetryDelayMillis(failedAttempts: Int): Long =
+            (DefaultRetryDelayMs * failedAttempts.coerceAtLeast(1))
+                .coerceAtMost(MaxRetryDelayMs)
     }
 }
 
