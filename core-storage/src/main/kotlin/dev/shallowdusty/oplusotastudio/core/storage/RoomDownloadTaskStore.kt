@@ -32,6 +32,9 @@ class RoomDownloadTaskStore(
         updatedAtMs: Long,
     ) {
         val current = downloadTaskDao.get(taskId) ?: return
+        if (current.toDownloadState().isUserPaused() && !state.canOverrideUserPause()) {
+            return
+        }
         downloadTaskDao.upsert(current.withState(state, updatedAtMs))
     }
 
@@ -101,3 +104,14 @@ private fun DownloadTaskEntity.toStoredDownloadTask(): StoredDownloadTask =
         state = toDownloadState(),
         updatedAtMs = updatedAtMs,
     )
+
+private fun DownloadState.isUserPaused(): Boolean =
+    this == DownloadState.Paused(DownloadState.Paused.PauseReason.User)
+
+private fun DownloadState.canOverrideUserPause(): Boolean =
+    when (this) {
+        DownloadState.Canceled,
+        DownloadState.Queued,
+        is DownloadState.Paused -> true
+        else -> false
+    }

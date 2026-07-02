@@ -64,6 +64,64 @@ class RoomDownloadTaskStoreTest {
     }
 
     @Test
+    fun `updateState preserves user pause over worker progress updates`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ).withState(
+                state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+                updatedAtMs = 150L,
+            ),
+        )
+
+        store.updateState(
+            taskId = "task-1",
+            state = DownloadState.Running(
+                downloadedBytes = 128L,
+                targetSize = 1024L,
+                speedBytesPerSec = 64L,
+            ),
+            updatedAtMs = 200L,
+        )
+
+        assertEquals(emptyList<DownloadTaskEntity>(), dao.upserts)
+        assertEquals(
+            DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+            store.getTask("task-1")?.state,
+        )
+    }
+
+    @Test
+    fun `updateState allows queued state to resume user paused tasks`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ).withState(
+                state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+                updatedAtMs = 150L,
+            ),
+        )
+
+        store.updateState(
+            taskId = "task-1",
+            state = DownloadState.Queued,
+            updatedAtMs = 200L,
+        )
+
+        assertEquals(DownloadState.Queued, store.getTask("task-1")?.state)
+    }
+
+    @Test
     fun `updateResumeMetadata rewrites validator fields and preserves state`() = runTest {
         val dao = FakeDownloadTaskDao()
         val store = RoomDownloadTaskStore(dao)
