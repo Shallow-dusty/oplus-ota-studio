@@ -184,5 +184,8 @@ private fun DeviceProfile.toProfile(): OtaProfile? {
         otaVersion = version,
         systemType = null,
         deviceCodename = product,
+        nvCarrier = nvCarrier,
+        deviceId = deviceId,
+        language = language,
     )
 }

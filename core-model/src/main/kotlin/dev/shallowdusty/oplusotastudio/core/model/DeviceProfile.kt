@@ -10,6 +10,10 @@ package dev.shallowdusty.oplusotastudio.core.model
  *
  * [buildDisplay] comes from `Build.DISPLAY` and is the most reliable source for
  * recovering the OTA build string via parsing (spec §2.3).
+ *
+ * [nvCarrier], [deviceId], and [language] are optional request hints used by
+ * ColorOS component OTA endpoints. They remain nullable because they are
+ * device-local signals, not required manual-profile fields.
  */
 data class DeviceProfile(
     val model: String?,
@@ -24,4 +28,7 @@ data class DeviceProfile(
     val serialSuffix: String?,
     /** True if any signal failed to be read; UI should prompt for manual entry. */
     val incomplete: Boolean,
+    val nvCarrier: String? = null,
+    val deviceId: String? = null,
+    val language: String? = null,
 )

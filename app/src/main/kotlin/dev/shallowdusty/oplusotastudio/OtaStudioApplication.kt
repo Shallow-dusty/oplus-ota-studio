@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.pm.ApplicationInfo
 import android.os.Environment
+import android.provider.Settings
 import androidx.work.WorkManager
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
 import dev.shallowdusty.oplusotastudio.core.download.DownloadAdmissionGate
@@ -22,10 +23,12 @@ import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutorProvider
 import dev.shallowdusty.oplusotastudio.download.WorkManagerDownloadWorkEnqueuer
+import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import dev.shallowdusty.oplusotastudio.logging.createAppLogArchiveExporter
 import dev.shallowdusty.oplusotastudio.logging.createAppDiagnosticsProvider
 import dev.shallowdusty.oplusotastudio.logging.createAppLogger
 import java.io.File
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -59,6 +62,15 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
             ),
             appLogArchiveExporter = createAppLogArchiveExporter(filesDir = filesDir),
             appDiagnosticsProvider = createAppDiagnosticsProvider(filesDir = filesDir),
+            deviceDetector = AndroidDeviceDetector(
+                deviceIdProvider = {
+                    Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+                },
+                languageTagProvider = {
+                    resources.configuration.locales.get(0)?.toLanguageTag()
+                        ?: Locale.getDefault().toLanguageTag()
+                },
+            ),
             downloadTaskStore = RoomDownloadTaskStore(database.downloadTaskDao()),
             downloadFilePromoter = AndroidMediaStoreDownloadFilePromoter(this),
             storageSnapshotProvider = AndroidDownloadStorageSnapshotProvider(this, downloadTempRoot),

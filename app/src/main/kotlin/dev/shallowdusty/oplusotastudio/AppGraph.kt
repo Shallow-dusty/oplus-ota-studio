@@ -14,8 +14,7 @@ import dev.shallowdusty.oplusotastudio.core.model.AlwaysAcceptedLookupPrivacyCon
 import dev.shallowdusty.oplusotastudio.core.model.LookupPrivacyConsentStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
-import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
-import dev.shallowdusty.oplusotastudio.core.ota.OkHttpOtaTransport
+import dev.shallowdusty.oplusotastudio.core.ota.ColorOsOtaLookupService
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import dev.shallowdusty.oplusotastudio.download.DownloadTaskWorkScheduler
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkerExecutor
@@ -55,6 +54,7 @@ class AppGraph(
     ),
     val appLogArchiveExporter: AppLogArchiveExporter? = null,
     val appDiagnosticsProvider: AppDiagnosticsProvider? = null,
+    val deviceDetector: DeviceDetector = AndroidDeviceDetector(),
     private val downloadTaskStore: DownloadTaskStore? = null,
     private val downloadFilePromoter: DownloadFilePromoter? = null,
     private val storageSnapshotProvider: (() -> DownloadStorageSnapshot)? = null,
@@ -63,11 +63,8 @@ class AppGraph(
     val downloadWorkScheduler: DownloadTaskWorkScheduler? = null,
     downloadWorkerExecutor: DownloadWorkerExecutor? = null,
 ) {
-    val deviceDetector: DeviceDetector = AndroidDeviceDetector()
     val otaLookupService: OtaLookupService = LoggingOtaLookupService(
-        delegate = LegacyOtaLookupService(
-            transport = OkHttpOtaTransport(),
-        ),
+        delegate = ColorOsOtaLookupService(),
         logger = appLogger,
     )
     private val realDownloadEngine: SimpleDownloadEngine? = downloadTempRoot

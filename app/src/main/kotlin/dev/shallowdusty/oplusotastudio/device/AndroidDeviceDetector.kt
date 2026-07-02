@@ -45,6 +45,8 @@ class AndroidDeviceDetector(
         )
     },
     private val propertyProvider: DevicePropertyProvider = AndroidSystemPropertyProvider(),
+    private val deviceIdProvider: () -> String? = { null },
+    private val languageTagProvider: () -> String? = { Locale.getDefault().toLanguageTag() },
     private val localeCountryProvider: () -> String = { Locale.getDefault().country },
 ) : DeviceDetector {
 
@@ -67,6 +69,9 @@ class AndroidDeviceDetector(
             region = resolveRegion(),
             serialSuffix = null,
             incomplete = facts.model.isNullOrBlank() || otaVersion.isNullOrBlank(),
+            nvCarrier = firstProperty("ro.build.oplus_nv_id"),
+            deviceId = deviceIdProvider()?.takeIf { it.isNotBlank() },
+            language = languageTagProvider()?.takeIf { it.isNotBlank() },
         )
     }
 

@@ -25,7 +25,10 @@ class AndroidDeviceDetectorTest {
                 "ro.oppo.market.name" to "OnePlus 9 Pro",
                 "ro.build.version.ota" to "LE2120_11.H.23_0001_000000000001",
                 "ro.oppo.region" to "CN",
+                "ro.build.oplus_nv_id" to "10010111",
             ),
+            deviceIdProvider = { "test-android-id" },
+            languageTagProvider = { "zh-Hans-CN" },
             localeCountryProvider = { "US" },
         )
 
@@ -38,6 +41,9 @@ class AndroidDeviceDetectorTest {
         assertEquals("14", profile.androidVersion)
         assertEquals("2026-06-05", profile.securityPatch)
         assertEquals(OtaRegion.China, profile.region)
+        assertEquals("10010111", profile.nvCarrier)
+        assertEquals("test-android-id", profile.deviceId)
+        assertEquals("zh-Hans-CN", profile.language)
         assertFalse(profile.incomplete)
     }
 

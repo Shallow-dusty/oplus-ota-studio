@@ -14,7 +14,7 @@ import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
-import dev.shallowdusty.oplusotastudio.core.ota.LegacyOtaLookupService
+import dev.shallowdusty.oplusotastudio.core.ota.ColorOsOtaLookupService
 import dev.shallowdusty.oplusotastudio.device.AndroidDeviceDetector
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkEnqueuer
 import dev.shallowdusty.oplusotastudio.download.DownloadWorkScheduler
@@ -52,7 +52,7 @@ class AppGraphTest {
         val loggingService = assertInstanceOf(LoggingOtaLookupService::class.java, graph.otaLookupService)
         val delegateField = LoggingOtaLookupService::class.java.getDeclaredField("delegate")
             .apply { isAccessible = true }
-        assertInstanceOf(LegacyOtaLookupService::class.java, delegateField.get(loggingService))
+        assertInstanceOf(ColorOsOtaLookupService::class.java, delegateField.get(loggingService))
     }
 
     @Test

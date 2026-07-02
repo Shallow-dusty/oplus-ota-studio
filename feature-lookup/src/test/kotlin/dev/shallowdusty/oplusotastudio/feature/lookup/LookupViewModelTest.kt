@@ -59,6 +59,26 @@ class LookupViewModelTest {
     }
 
     @Test
+    fun `detected profile carries live ColorOS request hints`() = runTest {
+        val vm = LookupViewModel(
+            deviceDetector = FakeDeviceDetector(
+                completeProfile().copy(
+                    nvCarrier = "10010111",
+                    deviceId = "test-android-id",
+                    language = "zh-Hans-CN",
+                ),
+            ),
+            lookupService = FakeLookupService(OtaLookupResult.NoUpdate),
+        )
+        advanceUntilIdle()
+
+        val ready = vm.uiState.value as LookupUiState.Ready
+        assertEquals("10010111", ready.profile.nvCarrier)
+        assertEquals("test-android-id", ready.profile.deviceId)
+        assertEquals("zh-Hans-CN", ready.profile.language)
+    }
+
+    @Test
     fun `lookup transitions Ready to Querying then PackageFound`() = runTest {
         val pkg = samplePackage()
         val vm = LookupViewModel(
