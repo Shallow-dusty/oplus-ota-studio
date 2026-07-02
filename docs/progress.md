@@ -64,6 +64,11 @@ release readiness is still out of scope.
   `LE2120_14.0.0.1901(CN01)` with size `6559817109` and MD5
   `5ae1e4d8101218d58c1da10092b22996`. Details:
   `docs/evidence/ota/live-coloros-oneplus9pro-cn-2026-07-02.txt`.
+- The current-version full ZIP package was downloaded locally on 2026-07-02 to
+  `E:\coding\oplus-ota-studio-downloads\LE2120_14.0.0.1901_CN01_full.zip`.
+  The file size is `6559817109` bytes and MD5 is
+  `5ae1e4d8101218d58c1da10092b22996`, matching the live endpoint metadata.
+  Details: `docs/evidence/download/current-full-package-oneplus9pro-cn-2026-07-02.txt`.
 - Lookup state presentation now has focused JVM coverage for detecting,
   incomplete profile, privacy disclosure, querying, package found, no update,
   and network/server/malformed error copy.
@@ -168,8 +173,9 @@ release readiness is still out of scope.
 - The ColorOS component endpoint chain is now proven by guarded phone-side
   instrumentation. No raw server response fixture is committed because the live
   response contains signed CDN package URLs.
-- v0.2 should still add broader live coverage for other regions/models and a
-  pure current-build no-update/update check.
+- The real current-version full package has been downloaded and verified on
+  local disk; v0.2 should still add broader live coverage for other
+  regions/models and a pure current-build no-update/update check.
 
 ### Release Readiness
 

@@ -1,0 +1,91 @@
+OPlus OTA Studio current-version full package download evidence
+Date: 2026-07-02
+Branch: feat/backend-core
+
+Purpose
+-------
+
+Prove that the full OTA package for the attached OnePlus 9 Pro CN current
+display version was actually downloaded to local disk and verified against the
+ColorOS endpoint metadata.
+
+Device Version
+--------------
+
+Physical device profile:
+
+    model: LE2120
+    product: OnePlus9Pro_CH
+    device: OnePlus9Pro
+    display version: LE2120_14.0.0.1901(CN01)
+    OTA build property: LE2120_11.H.23_3230_202504181723
+    region: CN
+
+Package Metadata
+----------------
+
+The package URL was obtained from the verified ColorOS component OTA chain
+recorded in:
+
+    docs/evidence/ota/live-coloros-oneplus9pro-cn-2026-07-02.txt
+
+Source host:
+
+    gauss-compotacostauto-cn.allawnfs.com
+
+HEAD response facts:
+
+    HTTP/1.1 200 OK
+    Content-Type: application/zip
+    Content-Length: 6559817109
+    Accept-Ranges: bytes
+    Last-Modified: Wed, 23 Apr 2025 02:23:22 GMT
+    x-amz-meta-filemd5: 5ae1e4d8101218d58c1da10092b22996
+
+The full CDN object path is not copied into this evidence file; the source host
+and immutable package metadata are enough to audit the local file without
+committing a long-lived package URL.
+
+Local Download
+--------------
+
+Download target:
+
+    E:\coding\oplus-ota-studio-downloads\LE2120_14.0.0.1901_CN01_full.zip
+
+Downloader:
+
+    aria2c with 8 splits, resume enabled
+
+Completion log:
+
+    Download complete: E:/coding/oplus-ota-studio-downloads/LE2120_14.0.0.1901_CN01_full.zip
+
+    Download Results:
+    gid   |stat|avg speed  |path/URI
+    ======+====+===========+=======================================================
+    a9f6ce|OK  |   7.5MiB/s|E:/coding/oplus-ota-studio-downloads/LE2120_14.0.0.1901_CN01_full.zip
+
+Verification
+------------
+
+PowerShell verification command:
+
+    $file='E:\coding\oplus-ota-studio-downloads\LE2120_14.0.0.1901_CN01_full.zip'
+    $item=Get-Item -LiteralPath $file
+    $md5=Get-FileHash -LiteralPath $file -Algorithm MD5
+
+Observed local file:
+
+    Path: E:\coding\oplus-ota-studio-downloads\LE2120_14.0.0.1901_CN01_full.zip
+    Length: 6559817109
+    LastWriteTime: 2026-07-02 19:52:07
+    MD5: 5ae1e4d8101218d58c1da10092b22996
+
+Conclusion
+----------
+
+The current-version full package for `LE2120_14.0.0.1901(CN01)` exists on local
+disk, has the exact byte length advertised by the live endpoint, and its MD5
+matches the OTA metadata.
+
