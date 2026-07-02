@@ -116,6 +116,7 @@ class ColorOsOtaProtocol(
             val root = JSONObject(rawJson)
             val responseCode = root.optInt("responseCode", 200)
             if (responseCode == 304) return OtaLookupResult.NoUpdate
+            if (root.isEmptyArtifactResponse(responseCode)) return OtaLookupResult.NoUpdate
             if (responseCode != 200) {
                 return OtaLookupResult.Error(
                     category = OtaErrorCategory.Server,
@@ -200,6 +201,12 @@ class ColorOsOtaProtocol(
             "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkA980wxi+eTGcFDiw2I6RrUeO4jL/Aj3Yw4dNuW7tYt+O1sRTHgrzxPD9SrOqzz7G0KgoSfdFHe3JVLPN+U1waK+T0HfLusVJshDaMrMiQFDUiKajb+QKr+bXQhVofH74fjat+oRJ8vjXARSpFk4/41x5j1Bt/2bHoqtdGPcUizZ4whMwzap+hzVlZgs7BNfepo24PWPRujsN3uopl+8u4HFpQDlQl7GdqDYDj2zNOHdFQI2UpSf0aIeKCKOpSKF72KDEESpJVQsqO4nxMwEi2jMujQeCHyTCjBZ+W35RzwT9+0pyZv8FB3c7FYY9FdF/+lvfax5mvFEBd9jO+dpMQIDAQAB"
     }
 }
+
+private fun JSONObject.isEmptyArtifactResponse(responseCode: Int): Boolean =
+    responseCode == EmptyArtifactResponseCode &&
+        optString("errMsg").contains("artifactV1Result is empty", ignoreCase = true)
+
+private const val EmptyArtifactResponseCode = 2004
 
 private val OtaRegion.colorOsCode: String
     get() = when (this) {

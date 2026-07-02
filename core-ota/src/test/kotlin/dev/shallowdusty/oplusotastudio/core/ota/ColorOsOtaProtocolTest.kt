@@ -95,6 +95,19 @@ class ColorOsOtaProtocolTest {
         assertEquals(OtaLookupResult.NoUpdate, result)
     }
 
+    @Test
+    fun `maps ColorOS empty artifact response to no update`() {
+        val protocol = protocol()
+        val request = protocol.buildRequest(sampleProfile())
+
+        val result = protocol.parseResponse(
+            request = request,
+            rawJson = """{"responseCode":2004,"errMsg":"artifactV1Result is empty"}""",
+        )
+
+        assertEquals(OtaLookupResult.NoUpdate, result)
+    }
+
     private fun protocol(): ColorOsOtaProtocol =
         ColorOsOtaProtocol(
             aesKeyProvider = { aesKey },
