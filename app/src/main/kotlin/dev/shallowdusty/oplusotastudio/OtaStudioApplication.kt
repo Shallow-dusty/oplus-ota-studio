@@ -1,7 +1,6 @@
 package dev.shallowdusty.oplusotastudio
 
 import android.app.Application
-import android.content.ComponentCallbacks2
 import android.content.pm.ApplicationInfo
 import android.os.Environment
 import android.provider.Settings
@@ -37,6 +36,10 @@ import kotlinx.coroutines.launch
 class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val downloadAdmissionGate = MutableDownloadAdmissionGate()
+    private val memoryPressureDownloadGateController = MemoryPressureDownloadGateController(
+        gate = downloadAdmissionGate,
+        rejectionReason = LowResourceDownloadRejectionReason,
+    )
 
     private val database: OtaStudioDatabase by lazy {
         createOtaStudioDatabase(this)
@@ -101,9 +104,7 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
     @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        if (level in ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW..ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
-            downloadAdmissionGate.rejectNewDownloads(LowResourceDownloadRejectionReason)
-        }
+        memoryPressureDownloadGateController.onTrimMemory(level)
     }
 
     private fun downloadTempRoots(): List<File> =
