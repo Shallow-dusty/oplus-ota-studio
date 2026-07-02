@@ -11,6 +11,12 @@ build/
 captures/
 .cxx/
 
+# Local OTA package downloads
+/downloads/
+/oplus-ota-studio-downloads/
+*.zip.part
+*.zip.bad
+
 # IntelliJ / Android Studio
 .idea/
 *.iml
