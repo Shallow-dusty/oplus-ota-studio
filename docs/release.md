@@ -6,7 +6,7 @@ variables.
 
 ## Version
 
-- Current private-trial version: `0.1.0`
+- Current trial version: `0.1.0`
 - Current `versionCode`: `10`
 
 ## Unsigned Local Build
@@ -75,3 +75,16 @@ Current-code release smoke after UI state presentation coverage on 2026-07-01:
   `AndroidRuntime` crash.
 - Detailed evidence:
   `docs/evidence/release/r8-release-api34-smoke-2026-07-01-ui-state-refresh.txt`.
+
+Physical-device current-code release smoke on 2026-07-02:
+
+- `:app:assembleRelease` passed with a temporary throwaway keystore under
+  `build/tmp/`.
+- The temporary-signed R8 release APK installed on a physical OnePlus 9 Pro CN
+  device.
+- Launching `.MainActivity` detected the device profile and a current-build
+  lookup rendered `已是最新` / `此设备配置暂无可用更新。`
+- A targeted logcat scan found no app-process `FATAL EXCEPTION` or
+  `AndroidRuntime` crash.
+- Detailed evidence:
+  `docs/evidence/release/r8-release-oneplus9pro-smoke-2026-07-02-current-build.txt`.

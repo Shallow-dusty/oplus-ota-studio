@@ -410,7 +410,11 @@ The PC companion should be treated as a second product surface, not a dependency
 
 ## Repository Setup
 
-The local project already lives at `E:\coding\oplus-ota-studio`, with GitHub remote `Shallow-dusty/oplus-ota-studio`. Keep the repository private until the app has a working first release candidate (v0.3).
+The local project already lives at `E:\coding\oplus-ota-studio`, with GitHub
+remote `Shallow-dusty/oplus-ota-studio`. The original private-until-v0.3 gate
+was superseded on 2026-07-02 after physical OnePlus 9 Pro CN release smoke and
+redacted evidence cleanup: the source repository may be public while APK
+distribution remains trial/self-build only.
 
 Before regular feature work begins, finish the v0.0 bootstrap checklist:
 

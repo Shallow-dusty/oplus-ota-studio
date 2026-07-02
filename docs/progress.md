@@ -9,7 +9,7 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot:
+- Latest backend fix at this snapshot:
   `c7ad5ec fix(core-ota): run OTA HTTP calls on IO dispatcher`
 - Local connected-device check on 2026-07-02:
   `adb devices -l` reported a physical OnePlus 9 Pro CN device
@@ -22,8 +22,9 @@ backend wiring for lookup, downloads, storage, logging, diagnostics, and
 WorkManager-backed download execution. It now also has physical-device ColorOS
 component OTA replay evidence for OnePlus 9 Pro CN.
 
-The remaining release blockers are release-focused: complete final claim
-cleanup and keep public release readiness out of scope.
+The source repository is now ready for public review. The installable APK
+should still be treated as a self-build/trial artifact until broader
+model/region coverage and durable release signing are in place.
 
 ## Implemented
 
@@ -217,7 +218,9 @@ cleanup and keep public release readiness out of scope.
   `docs/evidence/release/r8-release-oneplus9pro-smoke-2026-07-02-current-build.txt`.
 - Durable private signing material is intentionally not committed; use
   `docs/release.md` for the local signing workflow.
-- The repository should stay private until v0.3 release-candidate readiness.
+- Public-source readiness means the code and redacted evidence can be reviewed
+  in a public repository. It does not mean an official public APK release is
+  ready.
 
 ## Verification Snapshot
 
@@ -247,16 +250,15 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 
 ## Next Recommended Work
 
-Use
+The finish-path record is
 [`docs/superpowers/plans/2026-07-02-product-finish-path.md`](superpowers/plans/2026-07-02-product-finish-path.md)
-as the active finish plan.
+and the current follow-up list is:
 
-1. Stop expanding backend internals unless real-device or release validation
-   exposes a concrete blocking bug.
-2. Rerun private-trial release build/sign/install/launch smoke after the
-   ColorOS lookup code change.
-3. Run the final claim audit against README, docs, and user-facing strings.
-4. Keep lookup experimental for public claims unless/until more live coverage is
-   added beyond the OnePlus 9 Pro CN replay profile.
-5. Do not claim public release readiness until release smoke, claim audit, and
-   broader model/region confidence are complete.
+1. Open the backend-core pull request and let CI/Codex review the public-source
+   diff.
+2. Keep lookup compatibility claims narrow until more live coverage is added
+   beyond the OnePlus 9 Pro CN replay/current-build profile.
+3. Set up durable private signing only when an APK is actually distributed
+   outside this machine.
+4. Add broader screenshot/golden review and model/region live coverage before
+   calling this a public APK release.

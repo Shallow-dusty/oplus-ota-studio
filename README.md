@@ -5,11 +5,11 @@ profile setup, package lookup, resumable download, integrity verification, and
 clear status feedback — running entirely on the phone, no root required for the
 normal lookup/download flow.
 
-> **Status:** private-trial v0.1 convergence. The app now has real lookup,
-> download, storage, WorkManager, logging, diagnostics, MediaStore promotion
-> wiring, private-trial release signing configuration, and physical OnePlus 9
-> Pro CN live ColorOS replay evidence. It is not public-release complete yet:
-> final release smoke and claim cleanup are still open.
+> **Status:** public-source v0.1 trial. The app now has real lookup, download,
+> storage, WorkManager, logging, diagnostics, MediaStore promotion wiring,
+> release signing configuration, and physical OnePlus 9 Pro CN live ColorOS
+> evidence. The source is ready to review in public; the APK is still a
+> trial/self-build artifact, not a broad public release.
 > See [`docs/progress.md`](docs/progress.md) for the current progress panel.
 
 ## Project layout
@@ -57,6 +57,18 @@ The Gradle wrapper is pinned to Gradle 9.6.1.
 Private-trial release signing is documented in
 [`docs/release.md`](docs/release.md). Signing keys and passwords must stay out
 of the repository.
+
+## Public repository notes
+
+- This project is independent and is not affiliated with, endorsed by, or
+  supported by OPlus or OnePlus.
+- Hash checks verify download transfer integrity only. The app does not verify
+  OPlus OTA package signatures.
+- Real-device live evidence is currently strongest for OnePlus 9 Pro CN
+  (`LE2120` / `OnePlus9Pro_CH`). Other models and regions need their own live
+  validation before making broad compatibility claims.
+- OTA evidence files redact raw Android IDs, serials, IMEIs, and long-lived or
+  signed package URLs. The repository records package metadata, not OTA ZIPs.
 
 > **detekt deferred.** No stable detekt release supports Kotlin 2.4.0 yet
 > (1.23.8 tops out at Kotlin 2.0.21; 2.0.0-alpha.5 supports 2.4.0 but is a

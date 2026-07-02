@@ -148,7 +148,7 @@ git commit -m "docs: record OTA lookup evidence"
 - Modify: `docs/progress.md`
 - Create or modify: `docs/evidence/release/`
 
-- [ ] **Step 1: Build release APK**
+- [x] **Step 1: Build release APK**
 
 Run:
 
@@ -158,7 +158,7 @@ Run:
 
 Expected for success: release APK builds and R8 runs without errors.
 
-- [ ] **Step 2: Sign and verify with local throwaway values**
+- [x] **Step 2: Sign and verify with local throwaway values**
 
 Use the workflow in `docs/release.md`, then run:
 
@@ -169,7 +169,7 @@ Use the workflow in `docs/release.md`, then run:
 Expected for success: `Verifies` is true and the certificate output is recorded
 in `docs/evidence/release/`.
 
-- [ ] **Step 3: Install and launch on the best available target**
+- [x] **Step 3: Install and launch on the best available target**
 
 Prefer a physical OPlus device. If unavailable, use the newest emulator and
 state that it is emulator-only evidence.
@@ -203,7 +203,7 @@ git commit -m "docs: record private-trial release evidence"
 - Modify only if claims change: `README.md`
 - Modify only if claims change: `docs/release.md`
 
-- [ ] **Step 1: Audit v0.1 acceptance criteria**
+- [x] **Step 1: Audit v0.1 acceptance criteria**
 
 Compare `docs/progress.md` against the v0.1 checklist in
 `docs/superpowers/specs/2026-06-29-oplus-ota-studio-design.md`.
@@ -211,7 +211,7 @@ Compare `docs/progress.md` against the v0.1 checklist in
 Expected for success: every v0.1 item is either proven by an evidence file or
 explicitly called out as a private-trial limitation.
 
-- [ ] **Step 2: Remove overclaims**
+- [x] **Step 2: Remove overclaims**
 
 Search:
 
@@ -222,7 +222,7 @@ rg -n "signature|official|live-verified|release ready|public release|verified" R
 Expected for success: no user-facing copy implies OPlus affiliation, OTA
 signature verification, or public release readiness.
 
-- [ ] **Step 3: Run the final local gate**
+- [x] **Step 3: Run the final local gate**
 
 Run:
 
@@ -260,6 +260,8 @@ git commit -m "docs: finalize private-trial release claims"
 - PC-side replay to `otacn.oppo.com/OnePlusOTA/OnePlus_OTA.php` still fails
   during TLS handshake from both Windows curl and WSL curl; that path is stale
   for the supported OnePlus 9 Pro CN ColorOS chain.
-- Task 2 has recent API 34 emulator evidence, but should be rerun after any
-  further code change.
-- Task 3 remains open for final private-trial claim cleanup.
+- Task 2 is complete for the current source state: 2026-07-02 physical-device
+  release smoke passed on OnePlus 9 Pro CN.
+- Task 3 is complete for public-source review: README, progress, release notes,
+  and the spec now separate public repository readiness from public APK release
+  readiness.
