@@ -10,7 +10,7 @@ truth remains
 
 - Branch: `feat/backend-core`
 - Latest implementation commit at this snapshot:
-  `20120bd feat(app): wire live ColorOS OTA lookup`
+  `c7ad5ec fix(core-ota): run OTA HTTP calls on IO dispatcher`
 - Local connected-device check on 2026-07-02:
   `adb devices -l` reported a physical OnePlus 9 Pro CN device
   (`model: LE2120`, serial redacted).
@@ -22,9 +22,8 @@ backend wiring for lookup, downloads, storage, logging, diagnostics, and
 WorkManager-backed download execution. It now also has physical-device ColorOS
 component OTA replay evidence for OnePlus 9 Pro CN.
 
-The remaining release blockers are release-focused: rerun private-trial release
-smoke after the latest code change and complete final claim cleanup. Public
-release readiness is still out of scope.
+The remaining release blockers are release-focused: complete final claim
+cleanup and keep public release readiness out of scope.
 
 ## Implemented
 
@@ -69,6 +68,11 @@ release readiness is still out of scope.
   The file size is `6559817109` bytes and MD5 is
   `5ae1e4d8101218d58c1da10092b22996`, matching the live endpoint metadata.
   Details: `docs/evidence/download/current-full-package-oneplus9pro-cn-2026-07-02.txt`.
+- A true current-build OnePlus 9 Pro CN query on 2026-07-02 returned ColorOS
+  `responseCode=2004` / `artifactV1Result is empty`; this now maps to
+  `NoUpdate`. The temporary-signed release APK was installed on the physical
+  device, launched, and the UI showed `已是最新` instead of `未知错误`. Details:
+  `docs/evidence/release/r8-release-oneplus9pro-smoke-2026-07-02-current-build.txt`.
 - Lookup state presentation now has focused JVM coverage for detecting,
   incomplete profile, privacy disclosure, querying, package found, no update,
   and network/server/malformed error copy.
@@ -174,8 +178,10 @@ release readiness is still out of scope.
   instrumentation. No raw server response fixture is committed because the live
   response contains signed CDN package URLs.
 - The real current-version full package has been downloaded and verified on
-  local disk; v0.2 should still add broader live coverage for other
-  regions/models and a pure current-build no-update/update check.
+  local disk; a pure current-build no-update check now passes for OnePlus 9 Pro
+  CN. v0.2 should still add broader live coverage for other regions/models and
+  at least one pure current-build update-available check when a device profile
+  can naturally receive one.
 
 ### Release Readiness
 
@@ -204,6 +210,11 @@ release readiness is still out of scope.
   older differently signed smoke build, launched `.MainActivity`, and found no
   app-process fatal crash in a targeted logcat scan. Details:
   `docs/evidence/release/r8-release-api34-smoke-2026-07-01-ui-state-refresh.txt`.
+- Current-code physical-device release evidence on 2026-07-02 built a
+  temporary-signed R8 release APK, installed it on the OnePlus 9 Pro CN, launched
+  `.MainActivity`, and verified that the current-build lookup reaches the live
+  endpoint and renders the `NoUpdate` screen. Details:
+  `docs/evidence/release/r8-release-oneplus9pro-smoke-2026-07-02-current-build.txt`.
 - Durable private signing material is intentionally not committed; use
   `docs/release.md` for the local signing workflow.
 - The repository should stay private until v0.3 release-candidate readiness.
