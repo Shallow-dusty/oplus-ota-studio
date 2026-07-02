@@ -6,6 +6,7 @@ import java.io.IOException
 import kotlinx.coroutines.CancellationException
 
 class DownloadWorkerExecutorAdapter(
+    private val stopStoredTask: (String) -> Unit = {},
     private val executeStoredTask: suspend (String) -> DownloadState,
 ) : DownloadWorkerExecutor {
 
@@ -19,6 +20,10 @@ class DownloadWorkerExecutorAdapter(
         } catch (error: Throwable) {
             DownloadWorkerExecutionResult.Failed
         }
+
+    override fun stop(taskId: String) {
+        stopStoredTask(taskId)
+    }
 }
 
 object DownloadWorkerExecutionMapper {

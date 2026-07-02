@@ -98,7 +98,10 @@ class AppGraph(
     val downloadWorkerExecutor: DownloadWorkerExecutor? =
         downloadWorkerExecutor ?: realDownloadEngine?.let { engine ->
             SerialDownloadWorkerExecutor(
-                DownloadWorkerExecutorAdapter(engine::executeStoredTask),
+                DownloadWorkerExecutorAdapter(
+                    stopStoredTask = engine::stopStoredTask,
+                    executeStoredTask = engine::executeStoredTask,
+                ),
             )
         }
 

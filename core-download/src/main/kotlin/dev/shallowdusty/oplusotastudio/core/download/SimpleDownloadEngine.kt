@@ -13,6 +13,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.RandomAccessFile
+import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +52,7 @@ class SimpleDownloadEngine(
     private val tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
     private val queueMutex = Mutex()
     private val queuedTasks = ArrayDeque<SimpleDownloadTask>()
+    private val activeStoredTasks = ConcurrentHashMap<String, SimpleDownloadTask>()
     private var activeTask: SimpleDownloadTask? = null
 
     override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
@@ -113,7 +115,16 @@ class SimpleDownloadEngine(
             storedTask = storedTask,
         )
         tasks.value = tasks.value.filterNot { it.taskId == taskId } + task
-        return task.runToTerminal()
+        activeStoredTasks[taskId] = task
+        return try {
+            task.runToTerminal()
+        } finally {
+            activeStoredTasks.remove(taskId, task)
+        }
+    }
+
+    fun stopStoredTask(taskId: String) {
+        activeStoredTasks[taskId]?.stopActiveTransfer()
     }
 
     private inner class SimpleDownloadTask(
@@ -130,9 +141,12 @@ class SimpleDownloadEngine(
         private var currentCall: Call? = null
         @Volatile
         private var pauseRequested = false
+        @Volatile
+        private var stopRequested = false
 
         fun start() {
             pauseRequested = false
+            stopRequested = false
             job = scope.launch {
                 runToTerminal()
             }
@@ -174,6 +188,12 @@ class SimpleDownloadEngine(
             taskStore?.deleteTask(taskId)
         }
 
+        fun stopActiveTransfer() {
+            stopRequested = true
+            currentCall?.cancel()
+            job?.cancel()
+        }
+
         private suspend fun runDownload() {
             storagePreflightFailure()?.let { failure ->
                 updateState(
@@ -187,7 +207,7 @@ class SimpleDownloadEngine(
             }
 
             var failedAttempts = 0
-            while (coroutineContext.isActive) {
+            while (coroutineContext.isActive && !isUserStopped()) {
                 val outcome = try {
                     runDownloadAttempt()
                 } catch (error: IOException) {
@@ -400,7 +420,10 @@ class SimpleDownloadEngine(
         }
 
         private fun isUserStopped(): Boolean =
-            pauseRequested || _state.value is DownloadState.Paused || _state.value == DownloadState.Canceled
+            stopRequested ||
+                pauseRequested ||
+                _state.value is DownloadState.Paused ||
+                _state.value == DownloadState.Canceled
 
         private fun shouldEmitProgressUpdate(
             downloadedBytes: Long,

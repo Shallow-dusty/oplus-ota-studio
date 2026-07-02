@@ -12,4 +12,8 @@ class SerialDownloadWorkerExecutor(
         mutex.withLock {
             delegate.execute(taskId)
         }
+
+    override fun stop(taskId: String) {
+        delegate.stop(taskId)
+    }
 }

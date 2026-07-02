@@ -104,4 +104,17 @@ class DownloadWorkerExecutorAdapterTest {
             executor.execute("task-1"),
         )
     }
+
+    @Test
+    fun `stop delegates to stored task stop callback`() {
+        val stopped = mutableListOf<String>()
+        val executor = DownloadWorkerExecutorAdapter(
+            executeStoredTask = { DownloadState.Verified },
+            stopStoredTask = { stopped += it },
+        )
+
+        executor.stop("task-1")
+
+        assertEquals(listOf("task-1"), stopped)
+    }
 }

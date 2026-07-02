@@ -15,6 +15,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -523,6 +524,61 @@ class SimpleDownloadEngineTest {
         assertTrue(store.created.isEmpty())
         assertEquals("abc", tempFile.readText())
         assertEquals(DownloadState.Verified, store.updates.last().state)
+    }
+
+    @Test
+    fun `stopStoredTask cancels active persisted download without verifying partial file`() = runTest {
+        val body = "abcdef"
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .body(body)
+                .bodyDelay(1, TimeUnit.SECONDS)
+                .build(),
+        )
+        server.start()
+        val tempRoot = testTempRoot("stop-stored-task")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "e80b5017098950fc58aad83c8c14978e",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = DownloadState.Queued,
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val execution = async(Dispatchers.IO) { engine.executeStoredTask("task-1") }
+        withTimeout(5.seconds) {
+            while (store.updates.none { it.state is DownloadState.Running }) {
+                Thread.sleep(10)
+            }
+        }
+        engine.stopStoredTask("task-1")
+
+        val finalState = withTimeout(5.seconds) { execution.await() }
+
+        assertTrue(finalState is DownloadState.Running)
+        assertTrue(store.updates.none { it.state == DownloadState.Verifying })
+        assertTrue(store.updates.none { it.state == DownloadState.Verified })
+        assertTrue(tempFile.length() < body.length)
     }
 
     @Test
