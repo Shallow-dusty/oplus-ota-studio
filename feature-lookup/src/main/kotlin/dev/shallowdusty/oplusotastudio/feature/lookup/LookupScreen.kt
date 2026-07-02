@@ -175,7 +175,7 @@ private fun ReadyContent(
         Text(presentation.label.asString(), style = MaterialTheme.typography.titleMedium)
         OutlinedTextField(
             value = profile.model,
-            onValueChange = { onProfileChange(profile.copy(model = it)) },
+            onValueChange = { onProfileChange(profile.withManualModel(it)) },
             label = { Text(stringResource(R.string.lookup_label_model)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -419,3 +419,6 @@ private fun formatBytes(bytes: Long): String {
     val mb = bytes / 1_000_000.0
     return if (mb >= 1000) "%.2f GB".format(mb / 1000) else "%.1f MB".format(mb)
 }
+
+internal fun OtaProfile.withManualModel(model: String): OtaProfile =
+    copy(model = model, deviceCodename = null)
