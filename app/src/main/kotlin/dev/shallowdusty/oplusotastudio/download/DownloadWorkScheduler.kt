@@ -13,11 +13,19 @@ class DownloadWorkScheduler(
 ) : DownloadTaskWorkScheduler {
 
     override suspend fun schedule(taskId: String) {
+        enqueue(taskId, ExistingWorkPolicy.REPLACE)
+    }
+
+    override suspend fun recover(taskId: String) {
+        enqueue(taskId, ExistingWorkPolicy.KEEP)
+    }
+
+    private suspend fun enqueue(taskId: String, policy: ExistingWorkPolicy) {
         val preferences = preferencesStore.preferences.first()
         enqueuer.enqueue(
             taskId = taskId,
             request = requestFactory.create(taskId, preferences),
-            policy = ExistingWorkPolicy.REPLACE,
+            policy = policy,
         )
     }
 
@@ -28,6 +36,7 @@ class DownloadWorkScheduler(
 
 interface DownloadTaskWorkScheduler {
     suspend fun schedule(taskId: String)
+    suspend fun recover(taskId: String)
     fun cancel(taskId: String)
 }
 

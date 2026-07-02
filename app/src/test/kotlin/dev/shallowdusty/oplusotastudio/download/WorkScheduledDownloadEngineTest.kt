@@ -213,7 +213,7 @@ class WorkScheduledDownloadEngineTest {
     }
 
     @Test
-    fun `rescheduleRecoverableTasks queues interrupted running task`() = runTest {
+    fun `rescheduleRecoverableTasks recovers interrupted running task`() = runTest {
         val store = RecordingDownloadTaskStore(
             initialTasks = listOf(
                 storedTask(
@@ -239,7 +239,8 @@ class WorkScheduledDownloadEngineTest {
 
         engine.rescheduleRecoverableTasks()
 
-        assertEquals(listOf("running"), scheduler.scheduled)
+        assertEquals(listOf("running"), scheduler.recovered)
+        assertTrue(scheduler.scheduled.isEmpty())
         assertEquals(
             DownloadState.Queued,
             store.getTask("running")?.state,
@@ -251,7 +252,34 @@ class WorkScheduledDownloadEngineTest {
     }
 
     @Test
-    fun `rescheduleRecoverableTasks queues retriable failed task with retries remaining`() = runTest {
+    fun `rescheduleRecoverableTasks keeps existing work during startup recovery`() = runTest {
+        val store = RecordingDownloadTaskStore(
+            initialTasks = listOf(
+                storedTask(
+                    taskId = "running",
+                    state = DownloadState.Running(
+                        downloadedBytes = 5L,
+                        targetSize = 10L,
+                        speedBytesPerSec = null,
+                    ),
+                ),
+            ),
+        )
+        val scheduler = RecordingDownloadWorkScheduler()
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/recover-keep"),
+        )
+
+        engine.rescheduleRecoverableTasks()
+
+        assertEquals(listOf("running"), scheduler.recovered)
+        assertTrue(scheduler.scheduled.isEmpty())
+    }
+
+    @Test
+    fun `rescheduleRecoverableTasks recovers retriable failed task with retries remaining`() = runTest {
         val store = RecordingDownloadTaskStore(
             initialTasks = listOf(
                 storedTask(
@@ -281,7 +309,8 @@ class WorkScheduledDownloadEngineTest {
 
         engine.rescheduleRecoverableTasks()
 
-        assertEquals(listOf("network-failed"), scheduler.scheduled)
+        assertEquals(listOf("network-failed"), scheduler.recovered)
+        assertTrue(scheduler.scheduled.isEmpty())
         assertEquals(DownloadState.Queued, store.getTask("network-failed")?.state)
         assertTrue(store.getTask("checksum-failed")?.state is DownloadState.Failed)
     }
@@ -347,6 +376,12 @@ class WorkScheduledDownloadEngineTest {
 
         override suspend fun schedule(taskId: String) {
             scheduled += taskId
+        }
+
+        val recovered = mutableListOf<String>()
+
+        override suspend fun recover(taskId: String) {
+            recovered += taskId
         }
 
         override fun cancel(taskId: String) {

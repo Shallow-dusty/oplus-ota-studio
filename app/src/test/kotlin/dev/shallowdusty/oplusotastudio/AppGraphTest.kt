@@ -342,6 +342,8 @@ class AppGraphTest {
     private class NoOpDownloadTaskWorkScheduler : DownloadTaskWorkScheduler {
         override suspend fun schedule(taskId: String) = Unit
 
+        override suspend fun recover(taskId: String) = Unit
+
         override fun cancel(taskId: String) = Unit
     }
 
@@ -349,6 +351,10 @@ class AppGraphTest {
         val scheduled = mutableListOf<String>()
 
         override suspend fun schedule(taskId: String) {
+            scheduled += taskId
+        }
+
+        override suspend fun recover(taskId: String) {
             scheduled += taskId
         }
 

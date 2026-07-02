@@ -75,7 +75,7 @@ class WorkScheduledDownloadEngine(
                         updatedAtMs = nowMs(),
                     )
                 }
-                scheduler.schedule(task.taskId)
+                scheduler.recover(task.taskId)
             }
     }
 

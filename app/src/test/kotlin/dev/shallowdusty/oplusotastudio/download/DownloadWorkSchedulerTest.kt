@@ -34,6 +34,20 @@ class DownloadWorkSchedulerTest {
     }
 
     @Test
+    fun `recovers work without replacing an existing unique request`() = runTest {
+        val enqueuer = RecordingDownloadWorkEnqueuer()
+        val scheduler = DownloadWorkScheduler(
+            preferencesStore = RecordingDownloadPreferencesStore(DownloadPreferences()),
+            enqueuer = enqueuer,
+        )
+
+        scheduler.recover(taskId = "task-1")
+
+        assertEquals("task-1", enqueuer.enqueued.single().taskId)
+        assertEquals(ExistingWorkPolicy.KEEP, enqueuer.enqueued.single().policy)
+    }
+
+    @Test
     fun `cancels work by task id`() {
         val enqueuer = RecordingDownloadWorkEnqueuer()
         val scheduler = DownloadWorkScheduler(
