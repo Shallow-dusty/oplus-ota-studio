@@ -91,4 +91,49 @@ class AndroidDeviceDetectorTest {
         assertEquals("11.0.2.2.LE28AA", profile.otaVersion)
         assertFalse(profile.incomplete)
     }
+
+    @Test
+    fun `uses OPlus region property before locale fallback`() = runTest {
+        val detector = AndroidDeviceDetector(
+            buildFactsProvider = {
+                AndroidBuildFacts(
+                    model = "LE2120",
+                    product = "OnePlus9Pro_CH",
+                    display = "LE2120_14.0.0.1901(CN01)",
+                    androidVersion = "14",
+                    securityPatch = null,
+                )
+            },
+            propertyProvider = MapDevicePropertyProvider(
+                "persist.sys.oplus.region" to "CN",
+            ),
+            localeCountryProvider = { "US" },
+        )
+
+        val profile = detector.detect()
+
+        assertEquals(OtaRegion.China, profile.region)
+    }
+
+    @Test
+    fun `preserves ColorOS display version with region suffix`() = runTest {
+        val detector = AndroidDeviceDetector(
+            buildFactsProvider = {
+                AndroidBuildFacts(
+                    model = "LE2120",
+                    product = "OnePlus9Pro_CH",
+                    display = "LE2120_14.0.0.1901(CN01)",
+                    androidVersion = "14",
+                    securityPatch = null,
+                )
+            },
+            propertyProvider = MapDevicePropertyProvider(),
+            localeCountryProvider = { "CN" },
+        )
+
+        val profile = detector.detect()
+
+        assertEquals("LE2120_14.0.0.1901(CN01)", profile.otaVersion)
+        assertFalse(profile.incomplete)
+    }
 }

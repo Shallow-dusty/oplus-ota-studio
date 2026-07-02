@@ -79,7 +79,7 @@ class AndroidDeviceDetector(
         keys.firstNotNullOfOrNull { key -> propertyProvider.get(key)?.takeIf { it.isNotBlank() } }
 
     private fun resolveRegion(): OtaRegion {
-        val region = firstProperty("ro.oppo.region")?.uppercase(Locale.ROOT)
+        val region = firstProperty("ro.oppo.region", "persist.sys.oplus.region")?.uppercase(Locale.ROOT)
             ?: localeCountryProvider().uppercase(Locale.ROOT)
         return when (region) {
             "CN", "CHINA" -> OtaRegion.China
@@ -92,6 +92,7 @@ class AndroidDeviceDetector(
     private fun parseDisplayOtaVersion(value: String?): String? {
         val display = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         DisplayFullBuildPattern.find(display)?.let { return it.value }
+        ColorOsDisplayVersionPattern.find(display)?.let { return it.value }
         DisplayVersionWithSuffixPattern.find(display)?.let { return it.value }
         val version = DisplayVersionPattern.find(display)?.value ?: return null
         val suffix = DisplayBuildSuffixPattern.find(display)?.value
@@ -100,6 +101,7 @@ class AndroidDeviceDetector(
 
     private companion object {
         val DisplayFullBuildPattern = Regex("""\b[A-Z]{2}\d{4}_[A-Za-z0-9.]+(?:_[A-Za-z0-9.]+)+\b""")
+        val ColorOsDisplayVersionPattern = Regex("""\b[A-Z]{2}\d{4}_\d+(?:\.\d+){2,}\([A-Z0-9]+\)(?=\s|$)""")
         val DisplayVersionWithSuffixPattern = Regex("""(?<![0-9.])\d+(?:\.\d+){2,}\.[A-Z]{2}\d{2}[A-Z]{2}\b""")
         val DisplayVersionPattern = Regex("""(?<![0-9.])\d+(?:\.\d+){2,}(?![0-9.])""")
         val DisplayBuildSuffixPattern = Regex("""(?<![A-Z0-9])[A-Z]{2}\d{2}[A-Z]{2}(?![A-Z0-9])""")
