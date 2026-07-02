@@ -12,8 +12,6 @@ import dev.shallowdusty.oplusotastudio.core.model.isRetriable
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -30,9 +28,12 @@ class WorkScheduledDownloadEngine(
     override suspend fun enqueue(pkg: OtaPackage): DownloadTask {
         tempRoot.mkdirs()
         val taskId = idGenerator()
+        val tempFile = tempRoot.resolve("$taskId.zip.part")
         admissionGate.rejectionReason()?.let { reason ->
-            return RejectedDownloadTask(
+            return rejectAndPersist(
                 taskId = taskId,
+                pkg = pkg,
+                tempFile = tempFile,
                 raw = reason,
             )
         }
@@ -40,12 +41,13 @@ class WorkScheduledDownloadEngine(
             .first()
             .count { task -> !task.state.isTerminal }
         if (activeTasks >= maxQueuedTasks) {
-            return RejectedDownloadTask(
+            return rejectAndPersist(
                 taskId = taskId,
+                pkg = pkg,
+                tempFile = tempFile,
                 raw = "Download queue limit reached ($maxQueuedTasks tasks)",
             )
         }
-        val tempFile = tempRoot.resolve("$taskId.zip.part")
         taskStore.createQueuedTask(
             taskId = taskId,
             pkg = pkg,
@@ -120,6 +122,31 @@ class WorkScheduledDownloadEngine(
                 taskStore.getTask(taskId)?.state
         }
 
+    private suspend fun rejectAndPersist(
+        taskId: String,
+        pkg: OtaPackage,
+        tempFile: File,
+        raw: String,
+    ): DownloadTask {
+        val failed = DownloadState.Failed(
+            category = OtaErrorCategory.File,
+            retriesRemaining = 0,
+            raw = raw,
+        )
+        taskStore.createQueuedTask(
+            taskId = taskId,
+            pkg = pkg,
+            tempFilePath = tempFile.path,
+            updatedAtMs = nowMs(),
+        )
+        taskStore.updateState(
+            taskId = taskId,
+            state = failed,
+            updatedAtMs = nowMs(),
+        )
+        return storedTaskHandle(taskId, tempFile)
+    }
+
     private companion object {
         const val DefaultMaxQueuedTasks = 20
     }
@@ -139,26 +166,6 @@ private val StoredDownloadTask.shouldRecover: Boolean
             DownloadState.Unverified,
             DownloadState.Canceled,
             -> false
-        }
-
-private class RejectedDownloadTask(
-    override val taskId: String,
-    raw: String,
-) : DownloadTask {
-    private val currentState = MutableStateFlow(
-        DownloadState.Failed(
-            category = OtaErrorCategory.File,
-            retriesRemaining = 0,
-            raw = raw,
-        ),
-    )
-    override val state: Flow<DownloadState> = currentState.asStateFlow()
-
-    override suspend fun pause() = Unit
-
-    override suspend fun resume() = Unit
-
-    override suspend fun cancel() = Unit
 }
 
 private val DownloadState.isTerminal: Boolean

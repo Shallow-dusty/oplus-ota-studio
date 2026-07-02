@@ -62,7 +62,10 @@ class WorkScheduledDownloadEngineTest {
         assertEquals(OtaErrorCategory.File, failed.category)
         assertEquals(0, failed.retriesRemaining)
         assertTrue(failed.raw?.contains("queue limit") == true)
-        assertTrue(store.created.isEmpty())
+        val persisted = engine.observeAll().first().single { it.taskId == "rejected" }
+        val persistedFailed = persisted.state.first() as DownloadState.Failed
+        assertEquals(failed, persistedFailed)
+        assertEquals("rejected", store.created.single().taskId)
         assertTrue(scheduler.scheduled.isEmpty())
     }
 
@@ -84,7 +87,10 @@ class WorkScheduledDownloadEngineTest {
         assertEquals(OtaErrorCategory.File, failed.category)
         assertEquals(0, failed.retriesRemaining)
         assertEquals("Storage pressure is critical.", failed.raw)
-        assertTrue(store.created.isEmpty())
+        val persisted = engine.observeAll().first().single()
+        val persistedFailed = persisted.state.first() as DownloadState.Failed
+        assertEquals(failed, persistedFailed)
+        assertEquals("rejected", store.created.single().taskId)
         assertTrue(scheduler.scheduled.isEmpty())
     }
 
