@@ -61,6 +61,18 @@ class ColorOsOtaProtocolTest {
     }
 
     @Test
+    fun `builds ColorOS request with host override`() {
+        val protocol = protocol()
+
+        val request = protocol.buildRequest(
+            sampleProfile(hostOverride = "component-otapc-test.example"),
+        )
+
+        assertEquals("https://component-otapc-test.example/update/v3", request.url)
+        assertEquals("component-otapc-test.example", request.host)
+    }
+
+    @Test
     fun `decrypts ColorOS v3 component response into replayed package`() {
         val protocol = protocol()
         val request = protocol.buildRequest(sampleProfile())
@@ -138,13 +150,16 @@ class ColorOsOtaProtocolTest {
         ).toString()
     }
 
-    private fun sampleProfile(): OtaProfile =
+    private fun sampleProfile(
+        hostOverride: String? = null,
+    ): OtaProfile =
         OtaProfile(
             model = "LE2120",
             region = OtaRegion.China,
             otaVersion = "LE2120_11.H.23_0001_000000000001",
             systemType = "Color OS",
             deviceCodename = "OnePlus9Pro_CH",
+            hostOverride = hostOverride,
             nvCarrier = "10010111",
             deviceId = "test-device-id",
             language = "zh-Hans-CN",

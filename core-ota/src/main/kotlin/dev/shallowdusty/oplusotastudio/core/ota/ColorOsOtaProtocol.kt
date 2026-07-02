@@ -27,7 +27,7 @@ class ColorOsOtaProtocol(
     val isEnabled: Boolean = true
 
     fun buildRequest(profile: OtaProfile): ColorOsOtaRequest {
-        val config = serverConfig(profile.region)
+        val config = serverConfig(profile.region).withHostOverride(profile.hostOverride)
         val model = profile.deviceCodename?.takeIf { it.isNotBlank() } ?: profile.model
         val otaPrefix = profile.otaVersion.split("_").take(2).joinToString("_")
         val region = profile.region.colorOsCode
@@ -189,7 +189,22 @@ class ColorOsOtaProtocol(
         val serverUrl: String,
         val publicKey: String,
         val negotiationVersion: String,
-    )
+    ) {
+        fun withHostOverride(hostOverride: String?): ColorOsServerConfig {
+            val host = hostOverride?.trim()?.takeIf { it.isNotBlank() } ?: return this
+            val base = URI(serverUrl)
+            val overriddenUrl = URI(
+                base.scheme,
+                base.userInfo,
+                host,
+                base.port,
+                base.path,
+                base.query,
+                base.fragment,
+            ).toString()
+            return copy(serverUrl = overriddenUrl)
+        }
+    }
 
     private companion object {
         const val AesKeyBytes = 32
