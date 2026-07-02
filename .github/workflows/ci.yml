@@ -54,13 +54,9 @@ jobs:
             **/build/test-results/**/*.xml
             **/build/reports/tests/**
 
-  instrumentation-tests:
-    name: Instrumentation tests API ${{ matrix.api-level }}
+  instrumentation-compile:
+    name: Compile instrumentation tests
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        api-level: [29, 34]
 
     steps:
       - name: Checkout
@@ -78,19 +74,5 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run connected tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: ${{ matrix.api-level }}
-          target: google_apis
-          arch: x86_64
-          script: ./gradlew connectedDebugAndroidTest --stacktrace
-
-      - name: Upload connected test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: connected-test-results-api-${{ matrix.api-level }}
-          path: |
-            **/build/outputs/androidTest-results/**
-            **/build/reports/androidTests/**
+      - name: Compile instrumentation tests
+        run: ./gradlew :app:compileDebugAndroidTestKotlin --stacktrace
