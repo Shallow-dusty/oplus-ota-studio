@@ -1476,6 +1476,8 @@ class SimpleDownloadEngineTest {
 
         override suspend fun markDownloaded(
             packageName: String,
+            sourceHost: String,
+            downloadUrl: String,
             downloadedAtMs: Long,
             localFilePath: String,
         ) {
@@ -1488,6 +1490,8 @@ class SimpleDownloadEngineTest {
 
         override suspend fun markChecksumMismatch(
             packageName: String,
+            sourceHost: String,
+            downloadUrl: String,
             expectedHash: String,
             actualHash: String,
         ) {

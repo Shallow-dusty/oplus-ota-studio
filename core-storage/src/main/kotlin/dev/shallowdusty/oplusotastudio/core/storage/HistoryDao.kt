@@ -18,12 +18,20 @@ interface HistoryDao {
         WHERE id = (
             SELECT id FROM history
             WHERE packageName = :packageName
+                AND sourceHost = :sourceHost
+                AND downloadUrl = :downloadUrl
             ORDER BY lookedUpAtMs DESC
             LIMIT 1
         )
         """,
     )
-    suspend fun markDownloaded(packageName: String, downloadedAtMs: Long, localFilePath: String)
+    suspend fun markDownloaded(
+        packageName: String,
+        sourceHost: String,
+        downloadUrl: String,
+        downloadedAtMs: Long,
+        localFilePath: String,
+    )
 
     @Query(
         """
@@ -32,6 +40,8 @@ interface HistoryDao {
         WHERE id = (
             SELECT id FROM history
             WHERE packageName = :packageName
+                AND sourceHost = :sourceHost
+                AND downloadUrl = :downloadUrl
             ORDER BY lookedUpAtMs DESC
             LIMIT 1
         )
@@ -39,6 +49,8 @@ interface HistoryDao {
     )
     suspend fun markChecksumMismatch(
         packageName: String,
+        sourceHost: String,
+        downloadUrl: String,
         expectedHash: String,
         actualHash: String,
     )

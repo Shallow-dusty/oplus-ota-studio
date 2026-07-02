@@ -72,6 +72,8 @@ class RoomPackageRepositoryTest {
 
         repository.markDownloaded(
             packageName = "LE2120_14.0.0.1901(CN01)",
+            sourceHost = "component-otapc-cn.allawntech.com",
+            downloadUrl = "https://gauss-compotacostauto-cn.allawnfs.com/component-ota.zip",
             downloadedAtMs = 4000L,
             localFilePath = "content://downloads/package.zip",
         )
@@ -90,6 +92,46 @@ class RoomPackageRepositoryTest {
     }
 
     @Test
+    fun `markDownloaded matches package source and url before newest row`() = runTest {
+        val dao = FakeHistoryDao()
+        val repository = RoomPackageRepository(dao)
+        dao.rows.value = listOf(
+            sampleEntity(id = "target", lookedUpAtMs = 1000L).copy(
+                sourceHost = "component-otapc-cn.allawntech.com",
+                downloadUrl = "https://example.test/target.zip",
+            ),
+            sampleEntity(id = "newer-same-package", lookedUpAtMs = 2000L).copy(
+                sourceHost = "component-otapc-cn.allawntech.com",
+                downloadUrl = "https://example.test/newer.zip",
+            ),
+        )
+
+        repository.markDownloaded(
+            packageName = "LE2120_14.0.0.1901(CN01)",
+            sourceHost = "component-otapc-cn.allawntech.com",
+            downloadUrl = "https://example.test/target.zip",
+            downloadedAtMs = 4000L,
+            localFilePath = "content://downloads/package.zip",
+        )
+
+        assertEquals(
+            listOf(
+                sampleEntity(id = "target", lookedUpAtMs = 1000L).copy(
+                    sourceHost = "component-otapc-cn.allawntech.com",
+                    downloadUrl = "https://example.test/target.zip",
+                    downloadedAtMs = 4000L,
+                    localFilePath = "content://downloads/package.zip",
+                ),
+                sampleEntity(id = "newer-same-package", lookedUpAtMs = 2000L).copy(
+                    sourceHost = "component-otapc-cn.allawntech.com",
+                    downloadUrl = "https://example.test/newer.zip",
+                ),
+            ),
+            dao.rows.value,
+        )
+    }
+
+    @Test
     fun `markChecksumMismatch updates newest matching package row`() = runTest {
         val dao = FakeHistoryDao()
         val repository = RoomPackageRepository(dao)
@@ -101,6 +143,8 @@ class RoomPackageRepositoryTest {
 
         repository.markChecksumMismatch(
             packageName = "LE2120_14.0.0.1901(CN01)",
+            sourceHost = "component-otapc-cn.allawntech.com",
+            downloadUrl = "https://gauss-compotacostauto-cn.allawnfs.com/component-ota.zip",
             expectedHash = "expected-md5",
             actualHash = "actual-md5",
         )
@@ -113,6 +157,46 @@ class RoomPackageRepositoryTest {
                     checksumActualHash = "actual-md5",
                 ),
                 sampleEntity(id = "other", lookedUpAtMs = 3000L).copy(packageName = "LE2120_other"),
+            ),
+            dao.rows.value,
+        )
+    }
+
+    @Test
+    fun `markChecksumMismatch matches package source and url before newest row`() = runTest {
+        val dao = FakeHistoryDao()
+        val repository = RoomPackageRepository(dao)
+        dao.rows.value = listOf(
+            sampleEntity(id = "target", lookedUpAtMs = 1000L).copy(
+                sourceHost = "component-otapc-cn.allawntech.com",
+                downloadUrl = "https://example.test/target.zip",
+            ),
+            sampleEntity(id = "newer-same-package", lookedUpAtMs = 2000L).copy(
+                sourceHost = "component-otapc-cn.allawntech.com",
+                downloadUrl = "https://example.test/newer.zip",
+            ),
+        )
+
+        repository.markChecksumMismatch(
+            packageName = "LE2120_14.0.0.1901(CN01)",
+            sourceHost = "component-otapc-cn.allawntech.com",
+            downloadUrl = "https://example.test/target.zip",
+            expectedHash = "expected-md5",
+            actualHash = "actual-md5",
+        )
+
+        assertEquals(
+            listOf(
+                sampleEntity(id = "target", lookedUpAtMs = 1000L).copy(
+                    sourceHost = "component-otapc-cn.allawntech.com",
+                    downloadUrl = "https://example.test/target.zip",
+                    checksumExpectedHash = "expected-md5",
+                    checksumActualHash = "actual-md5",
+                ),
+                sampleEntity(id = "newer-same-package", lookedUpAtMs = 2000L).copy(
+                    sourceHost = "component-otapc-cn.allawntech.com",
+                    downloadUrl = "https://example.test/newer.zip",
+                ),
             ),
             dao.rows.value,
         )
@@ -168,11 +252,17 @@ class RoomPackageRepositoryTest {
 
         override suspend fun markDownloaded(
             packageName: String,
+            sourceHost: String,
+            downloadUrl: String,
             downloadedAtMs: Long,
             localFilePath: String,
         ) {
             val target = rows.value
-                .filter { it.packageName == packageName }
+                .filter {
+                    it.packageName == packageName &&
+                        it.sourceHost == sourceHost &&
+                        it.downloadUrl == downloadUrl
+                }
                 .maxByOrNull { it.lookedUpAtMs }
             rows.value = rows.value.map { row ->
                 if (row.id == target?.id) {
@@ -188,11 +278,17 @@ class RoomPackageRepositoryTest {
 
         override suspend fun markChecksumMismatch(
             packageName: String,
+            sourceHost: String,
+            downloadUrl: String,
             expectedHash: String,
             actualHash: String,
         ) {
             val target = rows.value
-                .filter { it.packageName == packageName }
+                .filter {
+                    it.packageName == packageName &&
+                        it.sourceHost == sourceHost &&
+                        it.downloadUrl == downloadUrl
+                }
                 .maxByOrNull { it.lookedUpAtMs }
             rows.value = rows.value.map { row ->
                 if (row.id == target?.id) {

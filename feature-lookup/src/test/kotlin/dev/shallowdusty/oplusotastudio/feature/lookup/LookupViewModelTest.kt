@@ -415,6 +415,8 @@ class LookupViewModelTest {
 
         override suspend fun markDownloaded(
             packageName: String,
+            sourceHost: String,
+            downloadUrl: String,
             downloadedAtMs: Long,
             localFilePath: String,
         ) = Unit

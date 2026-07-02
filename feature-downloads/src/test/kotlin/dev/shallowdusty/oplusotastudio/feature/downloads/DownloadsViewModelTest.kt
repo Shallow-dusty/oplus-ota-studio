@@ -316,7 +316,13 @@ class DownloadsViewModelTest {
     ) : PackageRepository {
         override suspend fun record(entry: HistoryEntry) = Unit
 
-        override suspend fun markDownloaded(packageName: String, downloadedAtMs: Long, localFilePath: String) = Unit
+        override suspend fun markDownloaded(
+            packageName: String,
+            sourceHost: String,
+            downloadUrl: String,
+            downloadedAtMs: Long,
+            localFilePath: String,
+        ) = Unit
 
         override fun observeHistory(): Flow<List<HistoryEntry>> = flowOf(history)
     }

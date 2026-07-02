@@ -14,11 +14,19 @@ interface PackageRepository {
     suspend fun record(entry: HistoryEntry)
 
     /** Mark the latest matching package row as downloaded after file promotion. */
-    suspend fun markDownloaded(packageName: String, downloadedAtMs: Long, localFilePath: String)
+    suspend fun markDownloaded(
+        packageName: String,
+        sourceHost: String,
+        downloadUrl: String,
+        downloadedAtMs: Long,
+        localFilePath: String,
+    )
 
     /** Persist checksum mismatch diagnostics for the latest matching package row. */
     suspend fun markChecksumMismatch(
         packageName: String,
+        sourceHost: String,
+        downloadUrl: String,
         expectedHash: String,
         actualHash: String,
     ) = Unit

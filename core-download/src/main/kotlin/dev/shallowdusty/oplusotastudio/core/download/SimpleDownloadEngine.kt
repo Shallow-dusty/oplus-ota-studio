@@ -438,6 +438,8 @@ class SimpleDownloadEngine(
                 is ChecksumResult.Mismatch -> {
                     packageRepository?.markChecksumMismatch(
                         packageName = pkg.versionName,
+                        sourceHost = pkg.sourceHost,
+                        downloadUrl = pkg.downloadUrl,
                         expectedHash = result.expectedHash,
                         actualHash = result.actualHash,
                     )
@@ -536,6 +538,8 @@ class SimpleDownloadEngine(
             )
             packageRepository?.markDownloaded(
                 packageName = pkg.versionName,
+                sourceHost = pkg.sourceHost,
+                downloadUrl = pkg.downloadUrl,
                 downloadedAtMs = nowMs(),
                 localFilePath = promoted.finalFilePath,
             )

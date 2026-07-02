@@ -17,11 +17,15 @@ class RoomPackageRepository(
 
     override suspend fun markDownloaded(
         packageName: String,
+        sourceHost: String,
+        downloadUrl: String,
         downloadedAtMs: Long,
         localFilePath: String,
     ) {
         historyDao.markDownloaded(
             packageName = packageName,
+            sourceHost = sourceHost,
+            downloadUrl = downloadUrl,
             downloadedAtMs = downloadedAtMs,
             localFilePath = localFilePath,
         )
@@ -29,11 +33,15 @@ class RoomPackageRepository(
 
     override suspend fun markChecksumMismatch(
         packageName: String,
+        sourceHost: String,
+        downloadUrl: String,
         expectedHash: String,
         actualHash: String,
     ) {
         historyDao.markChecksumMismatch(
             packageName = packageName,
+            sourceHost = sourceHost,
+            downloadUrl = downloadUrl,
             expectedHash = expectedHash,
             actualHash = actualHash,
         )
