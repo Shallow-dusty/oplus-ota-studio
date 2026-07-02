@@ -33,10 +33,12 @@ class ResumeRequestPlanner {
             return restart("Remote package changed, restarting from 0.")
         }
 
+        val resumeBytes = minOf(stored.downloadedBytes, stored.partFileBytes)
+            .coerceAtLeast(0L)
         return ResumeRequestPlan(
-            rangeStart = stored.downloadedBytes.coerceAtLeast(0L),
+            rangeStart = resumeBytes,
             discardPartial = false,
-            truncateToBytes = stored.downloadedBytes.takeIf { stored.partFileBytes > it },
+            truncateToBytes = resumeBytes.takeIf { stored.partFileBytes > it },
             reason = null,
         )
     }

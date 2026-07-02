@@ -768,6 +768,47 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `execute stored task verifies complete partial without redownloading`() = runTest {
+        server.enqueue(MockResponse(code = 416))
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val tempRoot = testTempRoot("execute-stored-complete-partial")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        tempFile.writeText("abc")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = "\"abc\"",
+                    lastModified = null,
+                    acceptRanges = true,
+                    state = DownloadState.Running(3L, 3L, null),
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val finalState = engine.executeStoredTask("task-1")
+
+        assertEquals(DownloadState.Verified, finalState)
+        assertEquals(0, server.requestCount)
+        assertEquals(DownloadState.Verified, store.updates.last().state)
+    }
+
+    @Test
     fun `execute stored task reuses existing in memory task row`() = runTest {
         server.enqueue(MockResponse(code = 200, body = "abc"))
         server.start()

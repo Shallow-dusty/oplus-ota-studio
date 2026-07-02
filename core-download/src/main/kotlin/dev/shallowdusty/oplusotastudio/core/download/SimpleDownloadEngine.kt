@@ -242,6 +242,7 @@ class SimpleDownloadEngine(
         }
 
         private suspend fun runDownloadAttempt(): DownloadAttemptOutcome {
+            completePartialOutcome()?.let { return it }
             val resumePlan = currentResumePlan()
             if (resumePlan?.discardPartial == true) {
                 tempFile.delete()
@@ -390,6 +391,20 @@ class SimpleDownloadEngine(
                     )
                 }
             }
+            return verifyDownloadedFile()
+        }
+
+        private suspend fun completePartialOutcome(): DownloadAttemptOutcome? {
+            val expectedSize = pkg.sizeBytes.takeIf { it > 0 } ?: return null
+            if (!tempFile.exists() || tempFile.length() < expectedSize) return null
+            if (tempFile.length() > expectedSize) {
+                tempFile.truncateTo(expectedSize)
+            }
+            return verifyDownloadedFile()
+        }
+
+        private suspend fun verifyDownloadedFile(): DownloadAttemptOutcome {
+            if (isUserStopped()) return DownloadAttemptOutcome.Finished
             updateState(DownloadState.Verifying)
             when (
                 val result = checksumVerifier.verify(

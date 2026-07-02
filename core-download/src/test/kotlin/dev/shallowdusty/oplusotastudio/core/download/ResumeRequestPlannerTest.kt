@@ -52,6 +52,27 @@ class ResumeRequestPlannerTest {
     }
 
     @Test
+    fun `resumes from actual part file length when stored progress is ahead`() {
+        val plan = planner.plan(
+            stored = ResumeSnapshot(
+                acceptRanges = true,
+                downloadedBytes = 2048L,
+                partFileBytes = 1024L,
+                etag = "\"abc\"",
+                lastModified = null,
+            ),
+            current = ResumeValidators(
+                etag = "\"abc\"",
+                lastModified = null,
+            ),
+        )
+
+        assertEquals(1024L, plan.rangeStart)
+        assertEquals(null, plan.truncateToBytes)
+        assertFalse(plan.discardPartial)
+    }
+
+    @Test
     fun `restarts when validators changed`() {
         val plan = planner.plan(
             stored = ResumeSnapshot(
