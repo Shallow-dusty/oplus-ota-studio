@@ -1153,6 +1153,66 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `resumed unknown-size short 206 uses content range total before unverified promotion`() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 206,
+                body = "c",
+                headers = Headers.Builder()
+                    .add("Content-Length", "1")
+                    .add("Content-Range", "bytes 2-2/4")
+                    .add("ETag", "\"abc\"")
+                    .add("Accept-Ranges", "bytes")
+                    .build(),
+            ),
+        )
+        server.start()
+        val tempRoot = testTempRoot("short-resumed-unknown-size")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        tempFile.writeText("ab")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = null,
+        ).copy(sizeBytes = 0L)
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = "\"abc\"",
+                    lastModified = null,
+                    acceptRanges = true,
+                    state = DownloadState.Running(2L, null, null),
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            idGenerator = { "task-1" },
+            maxAttempts = 1,
+        )
+
+        val task = engine.enqueue(pkg)
+
+        val finalState = withTimeout(5.seconds) {
+            task.state.first { it is DownloadState.Failed || it == DownloadState.Unverified }
+        }
+
+        val failed = finalState as DownloadState.Failed
+        assertEquals(OtaErrorCategory.Network, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertTrue(failed.raw?.contains("expected 4 bytes, got 3") == true)
+        assertEquals("bytes=2-", server.takeRequest().headers["Range"])
+        assertFalse(store.updates.any { it.state == DownloadState.Unverified })
+    }
+
+    @Test
     fun `restarts from zero when server ignores range request`() = runTest {
         server.enqueue(
             MockResponse(

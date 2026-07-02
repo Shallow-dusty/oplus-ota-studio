@@ -319,9 +319,8 @@ class SimpleDownloadEngine(
                 )
                 resumeMetadata = responseResumeMetadata
 
-                targetSize = pkg.sizeBytes.takeIf { it > 0 }
-                    ?: response.header("Content-Length")?.toLongOrNull()
                 val appendPartial = rangeStart != null && response.code == 206
+                targetSize = responseTargetSize(response, rangeStart)
                 if (rangeStart != null && !appendPartial) {
                     updateState(
                         DownloadState.Failed(
@@ -461,6 +460,24 @@ class SimpleDownloadEngine(
             val call = client.newCall(buildRequest(rangeStart))
             currentCall = call
             return call.execute()
+        }
+
+        private fun responseTargetSize(response: Response, rangeStart: Long?): Long? {
+            pkg.sizeBytes.takeIf { it > 0 }?.let { return it }
+            val contentLength = response.header("Content-Length")?.toLongOrNull()
+            if (rangeStart != null && response.code == 206) {
+                return contentRangeTotalSize(response) ?: contentLength?.let { rangeStart + it }
+            }
+            return contentLength
+        }
+
+        private fun contentRangeTotalSize(response: Response): Long? {
+            val total = response.header("Content-Range")
+                ?.substringAfter('/', missingDelimiterValue = "")
+                ?: return null
+            return total
+                .takeIf { it.isNotBlank() && it != "*" }
+                ?.toLongOrNull()
         }
 
         private fun isUserStopped(): Boolean =
