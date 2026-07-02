@@ -337,7 +337,7 @@ Use TDD for behavior-heavy code. The default verification ladder is pure JVM fir
 - Unit tests for OTA response parsing with successful, no-update, malformed, and missing-field fixtures (redacted captures from §1.5).
 - Unit tests for download state transitions (full state machine in §3.5), resume header calculation, etag-change discard, file promotion rules, and checksum mismatch.
 - Integration tests with a fake `MockWebServer` covering: full download + verify, resume after disconnect, server-side package change, and checksum mismatch.
-- Instrumentation tests for storage promotion to `MediaStore.Downloads` across API 26/29/34. CI runs API 29/34 first; API 26 may be local-only until emulator stability is proven, but its command and result must be recorded before v0.1 is called done.
+- Instrumentation tests for storage promotion to `MediaStore.Downloads` across API 26/29/34. CI compiles instrumentation tests as a stable PR gate; connected execution may remain local/manual until hosted emulator stability is proven, but commands and results must be recorded before v0.1 is called done.
 - UI tests for lookup state rendering and primary download interactions after the core flows exist; add Compose screenshot tests for each state in §6.
 
 The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver`) and local temp files over mocks where possible.
@@ -355,7 +355,7 @@ The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver
 - **Fallback baseline if AGP 9.2 or Kotlin 2.4 blocks Compose/Room/KSP stability:** Kotlin `2.2.21`, AGP `8.13.x`, JDK `17`, targetSdk `35`. If the fallback is used, open a `docs:` follow-up to record why and when to retry the modern baseline.
 - Build variants: `debug` (verbose logs, no R8), `release` (R8 full mode, obfuscation on, signed via a keystore stored outside the repo).
 - Android Lint runs in CI; new code must be clean. **detekt deferred:** no stable detekt release supports Kotlin 2.4.0 as of 2026-06 (1.23.8 tops out at Kotlin 2.0.21; 2.0.0-alpha.5 supports 2.4.0 but is excluded by the no-snapshot/alpha rule below). detekt is re-enabled as a follow-up once a stable release supporting Kotlin 2.4.0 ships; until then Android Lint is the sole static check.
-- **CI:** GitHub Actions matrix (unit tests on JVM, instrumentation on API 29/34 emulators via `reactivecircus/android-emulator-runner`). Block merges on red unit tests; instrumentation is informational until stable.
+- **CI:** GitHub Actions runs JVM tests, Android Lint, and instrumentation test compilation. Connected emulator/device execution is evidence-bearing but may stay local/manual until hosted emulator stability is proven.
 - **Branch & commit:** trunk `main` protected; feature branches `feat/`, `fix/`, `docs/`; squash-merge PRs; conventional-commit messages (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
 - **Dependencies:** version catalog (`libs.versions.toml`); no snapshot dependencies in `main`.
 
@@ -395,7 +395,7 @@ Done when:
 - [ ] `en` + `zh-rCN` strings complete; no hardcoded user-facing text.
 - [ ] Error categories in §8 all have user-facing copy and a details view.
 - [ ] Local logging + export (§9) wired to the details view.
-- [ ] R8 release build installs and runs; CI green on emulator matrix.
+- [ ] R8 release build installs and runs; CI green on unit/lint/instrumentation compilation, with connected emulator or device evidence recorded separately.
 - [ ] Public release readiness review passes: naming/trademark, privacy disclosure, fixture redistribution, screenshots, and branch protection.
 
 ### Future

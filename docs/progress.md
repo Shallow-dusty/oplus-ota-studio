@@ -145,7 +145,9 @@ model/region coverage and durable release signing are in place.
   `AndroidMediaStoreDownloadFilePromoterInstrumentedTest.promotesZipIntoPublicDownloadsOnLegacyStorage`
   on `OPlus_API26(AVD) - 8.0.0`; XML result is retained under
   `docs/evidence/instrumentation/`.
-- CI includes unit/lint plus emulator instrumentation jobs for API 29 and API 34.
+- CI includes unit/lint plus instrumentation test compilation. Connected
+  emulator/device execution remains recorded local/manual evidence because
+  GitHub-hosted emulator runs are not a stable PR gate yet.
 - Manifest disables cleartext traffic and declares foreground data-sync service
   support.
 
