@@ -22,6 +22,9 @@ class OtaProfileTest {
         // Optional fields default to null.
         assertEquals(null, profile.systemType)
         assertEquals(null, profile.deviceCodename)
+        assertEquals(null, profile.nvCarrier)
+        assertEquals(null, profile.deviceId)
+        assertEquals(null, profile.language)
     }
 
     @Test
@@ -48,6 +51,22 @@ class OtaProfileTest {
         )
 
         assertEquals("ota.example.invalid", profile.hostOverride)
+    }
+
+    @Test
+    fun `profile can carry live ColorOS request hints`() {
+        val profile = OtaProfile(
+            model = "LE2120",
+            region = OtaRegion.China,
+            otaVersion = "LE2120_11.H.23_0001_000000000001",
+            nvCarrier = "10010111",
+            deviceId = "test-device-id",
+            language = "zh-Hans-CN",
+        )
+
+        assertEquals("10010111", profile.nvCarrier)
+        assertEquals("test-device-id", profile.deviceId)
+        assertEquals("zh-Hans-CN", profile.language)
     }
 
     @Test

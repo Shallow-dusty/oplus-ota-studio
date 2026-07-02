@@ -1,6 +1,7 @@
 package dev.shallowdusty.oplusotastudio.core.ota
 
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
+import dev.shallowdusty.oplusotastudio.core.model.OtaEvidenceLevel
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
@@ -59,7 +60,11 @@ class JsonOtaProtocol(
         )
     }
 
-    fun parseDecryptedComponentPayload(rawJson: String, sourceHost: String): OtaLookupResult =
+    fun parseDecryptedComponentPayload(
+        rawJson: String,
+        sourceHost: String,
+        evidenceLevel: OtaEvidenceLevel = OtaEvidenceLevel.Synthetic,
+    ): OtaLookupResult =
         runCatching {
             val root = JSONObject(rawJson)
             val components = root.optJSONArray("components")
@@ -87,6 +92,7 @@ class JsonOtaProtocol(
                     md5 = packets.optString("md5").takeIf { it.isNotBlank() },
                     sha256 = null,
                     releaseNotes = root.optString("releaseNotes").takeIf { it.isNotBlank() },
+                    evidenceLevel = evidenceLevel,
                 ),
             )
         }.getOrElse {
