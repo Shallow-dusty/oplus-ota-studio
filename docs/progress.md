@@ -1,6 +1,6 @@
 # OPlus OTA Studio Progress
 
-Last updated: 2026-07-01
+Last updated: 2026-07-02
 
 This file is the current implementation/status panel. The product source of
 truth remains
@@ -9,8 +9,9 @@ truth remains
 ## Current Branch
 
 - Branch: `feat/backend-core`
-- Latest implementation commit at this snapshot: `7ae024e build: enable R8 for release`
-- Local connected-device check on 2026-07-01 after emulator shutdown:
+- Latest implementation commit at this snapshot:
+  `b400c8e docs: record UI state render evidence`
+- Local connected-device check on 2026-07-02:
   `adb devices` reported no attached devices.
 
 ## Current Product Status
@@ -136,18 +137,20 @@ evidence and live/captured/replayed OTA lookup evidence.
 
 ### Evidence And Real-World Validation
 
-- No real device is currently attached locally, so device detection and
-  MediaStore flows have not been locally run on a physical OnePlus/OPlus device
-  in this snapshot.
+- No real device is currently attached locally, so device detection, live
+  lookup, and MediaStore flows have not been locally run on a physical
+  OnePlus/OPlus device in this snapshot.
 - Local emulator validation now covers API 26, API 29, API 30, and API 34
   storage promotion behavior, plus an API 34 controlled end-to-end download
   smoke through parser, engine, checksum verification, and MediaStore promotion.
 - No committed `captured-real-*` or `replayed-real-profile-*` successful OTA
-  response fixture exists yet; local 2026-07-01 replay attempts against
+  response fixture exists yet; local 2026-07-01 and 2026-07-02 replay attempts against
   `otacn.oppo.com/OnePlusOTA/OnePlus_OTA.php` did not complete the TLS/HTTP
   handshake from this machine. Windows `curl.exe` failed with Schannel
   `failed to receive handshake`; WSL `curl` failed with OpenSSL
   `SSL_ERROR_SYSCALL`.
+  The latest evidence log is
+  `docs/evidence/ota/live-replay-attempt-2026-07-02.txt`.
 - The ColorOS component parser is synthetic-schema coverage, not proof of a live
   server chain.
 - v0.2 still requires at least one live-endpoint verified region if v0.1 ships
@@ -209,14 +212,14 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 ## Next Recommended Work
 
 Use
-[`docs/superpowers/plans/2026-07-01-v0.1-product-convergence.md`](superpowers/plans/2026-07-01-v0.1-product-convergence.md)
-as the active convergence plan.
+[`docs/superpowers/plans/2026-07-02-product-finish-path.md`](superpowers/plans/2026-07-02-product-finish-path.md)
+as the active finish plan.
 
 1. Stop expanding backend internals unless real-device or release validation
    exposes a concrete blocking bug.
-2. Collect a captured-real or replayed-real-profile OTA success fixture, or keep
-   lookup clearly experimental until live verification is possible.
-3. Add focused lookup/download UI state confidence tests before any screenshot
-   or visual-polish pass.
-4. Cut a private-trial release only with explicit known limitations; do not
-   claim public release readiness without real-device/live OTA evidence.
+2. Attach a physical OnePlus/OPlus device and collect the first captured-real,
+   replayed-real-profile, or live-verified OTA lookup evidence.
+3. If no physical device is available, keep lookup clearly experimental and cut
+   only a private-trial build with explicit limitations.
+4. Rerun release smoke after any further code change; do not claim public
+   release readiness without real-device/live OTA evidence.
