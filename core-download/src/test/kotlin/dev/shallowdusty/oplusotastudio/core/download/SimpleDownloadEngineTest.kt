@@ -625,6 +625,45 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `execute stored user paused task returns paused state without downloading`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val tempRoot = testTempRoot("execute-stored-user-paused-task")
+        val paused = DownloadState.Paused(DownloadState.Paused.PauseReason.User)
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempRoot.resolve("task-1.zip.part").path,
+                    finalFilePath = null,
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = paused,
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val finalState = engine.executeStoredTask("task-1")
+
+        assertEquals(paused, finalState)
+        assertEquals(0, server.requestCount)
+        assertTrue(store.updates.isEmpty())
+    }
+
+    @Test
     fun `execute stored task reuses existing in memory task row`() = runTest {
         server.enqueue(MockResponse(code = 200, body = "abc"))
         server.start()

@@ -111,7 +111,7 @@ class SimpleDownloadEngine(
                 retriesRemaining = 0,
                 raw = "Download task not found: $taskId",
             )
-        if (storedTask.state.isTerminal) return storedTask.state
+        if (storedTask.state.isTerminal || storedTask.state.isUserPaused) return storedTask.state
         val task = SimpleDownloadTask(
             taskId = storedTask.taskId,
             pkg = storedTask.pkg,
@@ -645,3 +645,6 @@ private val DownloadState.isTerminal: Boolean
             is DownloadState.Failed -> retriesRemaining <= 0
             else -> false
         }
+
+private val DownloadState.isUserPaused: Boolean
+    get() = this == DownloadState.Paused(DownloadState.Paused.PauseReason.User)
