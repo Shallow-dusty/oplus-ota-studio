@@ -14,7 +14,11 @@ class DownloadWorkScheduler(
 
     override suspend fun schedule(taskId: String) {
         val preferences = preferencesStore.preferences.first()
-        enqueuer.enqueue(taskId, requestFactory.create(taskId, preferences))
+        enqueuer.enqueue(
+            taskId = taskId,
+            request = requestFactory.create(taskId, preferences),
+            policy = ExistingWorkPolicy.REPLACE,
+        )
     }
 
     override fun cancel(taskId: String) {
@@ -28,17 +32,25 @@ interface DownloadTaskWorkScheduler {
 }
 
 interface DownloadWorkEnqueuer {
-    fun enqueue(taskId: String, request: OneTimeWorkRequest)
+    fun enqueue(
+        taskId: String,
+        request: OneTimeWorkRequest,
+        policy: ExistingWorkPolicy,
+    )
     fun cancel(taskId: String)
 }
 
 class WorkManagerDownloadWorkEnqueuer(
     private val workManager: WorkManager,
 ) : DownloadWorkEnqueuer {
-    override fun enqueue(taskId: String, request: OneTimeWorkRequest) {
+    override fun enqueue(
+        taskId: String,
+        request: OneTimeWorkRequest,
+        policy: ExistingWorkPolicy,
+    ) {
         workManager.enqueueUniqueWork(
             uniqueWorkName(taskId),
-            ExistingWorkPolicy.KEEP,
+            policy,
             request,
         )
     }

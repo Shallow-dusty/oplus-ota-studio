@@ -1,5 +1,6 @@
 package dev.shallowdusty.oplusotastudio.download
 
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferences
@@ -27,6 +28,7 @@ class DownloadWorkSchedulerTest {
 
         val request = enqueuer.enqueued.single().request
         assertEquals("task-1", enqueuer.enqueued.single().taskId)
+        assertEquals(ExistingWorkPolicy.REPLACE, enqueuer.enqueued.single().policy)
         assertEquals("task-1", request.workSpec.input.getString(DownloadWorker.TaskIdKey))
         assertEquals(NetworkType.CONNECTED, request.workSpec.constraints.requiredNetworkType)
     }
@@ -48,8 +50,12 @@ class DownloadWorkSchedulerTest {
         val enqueued = mutableListOf<EnqueuedRequest>()
         val canceled = mutableListOf<String>()
 
-        override fun enqueue(taskId: String, request: OneTimeWorkRequest) {
-            enqueued += EnqueuedRequest(taskId, request)
+        override fun enqueue(
+            taskId: String,
+            request: OneTimeWorkRequest,
+            policy: ExistingWorkPolicy,
+        ) {
+            enqueued += EnqueuedRequest(taskId, request, policy)
         }
 
         override fun cancel(taskId: String) {
@@ -60,6 +66,7 @@ class DownloadWorkSchedulerTest {
     private data class EnqueuedRequest(
         val taskId: String,
         val request: OneTimeWorkRequest,
+        val policy: ExistingWorkPolicy,
     )
 
     private class RecordingDownloadPreferencesStore(

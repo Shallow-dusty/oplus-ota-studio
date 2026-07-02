@@ -1,5 +1,6 @@
 package dev.shallowdusty.oplusotastudio
 
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import dev.shallowdusty.oplusotastudio.core.download.DownloadFilePromoter
 import dev.shallowdusty.oplusotastudio.core.download.DownloadStorageSnapshot
@@ -327,7 +328,11 @@ class AppGraphTest {
     }
 
     private class NoOpDownloadWorkEnqueuer : DownloadWorkEnqueuer {
-        override fun enqueue(taskId: String, request: OneTimeWorkRequest) = Unit
+        override fun enqueue(
+            taskId: String,
+            request: OneTimeWorkRequest,
+            policy: ExistingWorkPolicy,
+        ) = Unit
 
         override fun cancel(taskId: String) = Unit
     }
