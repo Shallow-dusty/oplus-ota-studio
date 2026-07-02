@@ -10,6 +10,7 @@ import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -676,14 +678,18 @@ class SimpleDownloadEngineTest {
         )
 
         val execution = async(Dispatchers.IO) { engine.executeStoredTask("task-1") }
-        withTimeout(5.seconds) {
-            while (store.updates.none { it.state is DownloadState.Running }) {
-                Thread.sleep(10)
+        withContext(Dispatchers.Default) {
+            withTimeout(5.seconds) {
+                while (store.updates.none { it.state is DownloadState.Running }) {
+                    Thread.sleep(10)
+                }
             }
         }
         engine.stopStoredTask("task-1")
 
-        val finalState = withTimeout(5.seconds) { execution.await() }
+        val finalState = withContext(Dispatchers.Default) {
+            withTimeout(5.seconds) { execution.await() }
+        }
 
         assertTrue(finalState is DownloadState.Running)
         assertTrue(store.updates.none { it.state == DownloadState.Verifying })
@@ -1565,7 +1571,7 @@ class SimpleDownloadEngineTest {
         private val existingTasks: Map<String, StoredDownloadTask> = emptyMap(),
     ) : DownloadTaskStore {
         val created = mutableListOf<CreatedTask>()
-        val updates = mutableListOf<StateUpdate>()
+        val updates = CopyOnWriteArrayList<StateUpdate>()
         val resumeMetadata = mutableListOf<ResumeMetadataUpdate>()
         val finalPaths = mutableListOf<FinalPathUpdate>()
         val deleted = mutableListOf<String>()
