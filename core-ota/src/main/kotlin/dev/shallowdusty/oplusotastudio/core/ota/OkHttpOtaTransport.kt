@@ -1,18 +1,22 @@
 package dev.shallowdusty.oplusotastudio.core.ota
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.HttpUrl.Companion.toHttpUrl
 
 class OkHttpOtaTransport(
     private val client: OkHttpClient = OkHttpClient(),
     private val baseUrlOverride: HttpUrl? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : OtaTransport {
 
-    override suspend fun post(request: LegacyOtaRequest): OtaHttpResponse {
+    override suspend fun post(request: LegacyOtaRequest): OtaHttpResponse = withContext(ioDispatcher) {
         val url = baseUrlOverride
             ?.newBuilder()
             ?.encodedPath(request.path)
@@ -26,7 +30,7 @@ class OkHttpOtaTransport(
             .build()
 
         client.newCall(httpRequest).execute().use { response ->
-            return OtaHttpResponse(
+            OtaHttpResponse(
                 statusCode = response.code,
                 body = response.body.string(),
                 sourceHost = request.host,
