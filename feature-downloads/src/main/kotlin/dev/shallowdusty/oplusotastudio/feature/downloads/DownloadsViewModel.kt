@@ -132,6 +132,7 @@ class DownloadsViewModel(
 
     fun enqueueHistoryPackage(historyId: String) {
         val entry = historyEntries[historyId] ?: return
+        if (entry.downloadUrl.isBlank()) return
         viewModelScope.launch {
             engine.enqueue(entry.toOtaPackage())
         }

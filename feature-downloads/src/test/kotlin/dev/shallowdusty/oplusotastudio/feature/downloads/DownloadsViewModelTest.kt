@@ -233,6 +233,23 @@ class DownloadsViewModelTest {
         assertEquals(OtaEvidenceLevel.LiveVerified, pkg.evidenceLevel)
     }
 
+    @Test
+    fun `download from legacy history row without url is ignored`() = runTest {
+        val engine = FakeDownloadEngine()
+        val repository = FakePackageRepository(
+            history = listOf(
+                sampleHistoryEntry().copy(downloadUrl = ""),
+            ),
+        )
+        val vm = DownloadsViewModel(engine, repository)
+        advanceUntilIdle()
+
+        vm.enqueueHistoryPackage("history-1")
+        advanceUntilIdle()
+
+        assertTrue(engine.enqueuedPackages.isEmpty())
+    }
+
     private fun samplePackage() = OtaPackage(
         versionName = "12.0.0.0.LE28AA",
         type = "full",
