@@ -514,6 +514,38 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `promotion runtime failure becomes file failure without leaving verifying`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val store = RecordingDownloadTaskStore()
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("promotion-runtime-failure"),
+            scope = backgroundScope,
+            taskStore = store,
+            filePromoter = ThrowingDownloadFilePromoter(SecurityException("permission revoked")),
+            maxAttempts = 1,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = "900150983cd24fb0d6963f7d28e17f72",
+            ),
+        )
+
+        val finalState = withTimeout(5.seconds) {
+            task.state.first { it is DownloadState.Failed }
+        }
+
+        val failed = finalState as DownloadState.Failed
+        assertEquals(OtaErrorCategory.File, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertEquals("permission revoked", failed.raw)
+        assertEquals(failed, store.updates.last().state)
+    }
+
+    @Test
     fun `fails before network request when storage preflight fails`() = runTest {
         val store = RecordingDownloadTaskStore()
         val engine = SimpleDownloadEngine(
@@ -1639,7 +1671,7 @@ class SimpleDownloadEngineTest {
     }
 
     private class ThrowingDownloadFilePromoter(
-        private val error: IOException,
+        private val error: Throwable,
     ) : DownloadFilePromoter {
         override suspend fun promote(
             taskId: String,

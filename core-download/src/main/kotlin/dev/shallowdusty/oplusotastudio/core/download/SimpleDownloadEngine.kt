@@ -16,6 +16,7 @@ import java.io.RandomAccessFile
 import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -417,6 +418,14 @@ class SimpleDownloadEngine(
                 raw = "Unexpected download size: expected $expectedSize bytes, got $actualSize",
             )
 
+        private fun promotionFailure(error: Throwable): DownloadAttemptOutcome.Failed {
+            if (error is CancellationException) throw error
+            return DownloadAttemptOutcome.Failed(
+                category = OtaErrorCategory.File,
+                raw = error.message,
+            )
+        }
+
         private suspend fun verifyDownloadedFile(): DownloadAttemptOutcome {
             if (isUserStopped()) return DownloadAttemptOutcome.Finished
             updateState(DownloadState.Verifying)
@@ -430,22 +439,16 @@ class SimpleDownloadEngine(
                 is ChecksumResult.Verified -> {
                     try {
                         promoteVerifiedFile()
-                    } catch (error: IOException) {
-                        return DownloadAttemptOutcome.Failed(
-                            category = OtaErrorCategory.File,
-                            raw = error.message,
-                        )
+                    } catch (error: Throwable) {
+                        return promotionFailure(error)
                     }
                     updateState(DownloadState.Verified)
                 }
                 ChecksumResult.Unverified -> {
                     try {
                         promoteVerifiedFile()
-                    } catch (error: IOException) {
-                        return DownloadAttemptOutcome.Failed(
-                            category = OtaErrorCategory.File,
-                            raw = error.message,
-                        )
+                    } catch (error: Throwable) {
+                        return promotionFailure(error)
                     }
                     updateState(DownloadState.Unverified)
                 }
