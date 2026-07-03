@@ -964,6 +964,53 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `execute stored task discards oversized partial before retrying`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val tempRoot = testTempRoot("execute-stored-oversized-partial")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        tempFile.writeText("abcd")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        ).copy(sizeBytes = 3L)
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = DownloadState.Running(4L, 3L, null),
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            retryDelay = {},
+        )
+
+        val finalState = engine.executeStoredTask("task-1")
+
+        assertEquals(DownloadState.Verified, finalState)
+        assertEquals(1, server.requestCount)
+        assertEquals("abc", tempFile.readText())
+        assertTrue(
+            store.updates.any { update ->
+                val failed = update.state as? DownloadState.Failed
+                failed?.raw?.contains("Unexpected download size") == true
+            },
+        )
+    }
+
+    @Test
     fun `execute stored task reuses existing in memory task row`() = runTest {
         server.enqueue(MockResponse(code = 200, body = "abc"))
         server.start()

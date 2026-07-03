@@ -397,6 +397,7 @@ class SimpleDownloadEngine(
                     )
                 }
                 if (downloaded > expectedSize) {
+                    tempFile.delete()
                     return unexpectedSizeFailure(expectedSize, downloaded)
                 }
             }
@@ -407,7 +408,9 @@ class SimpleDownloadEngine(
             val expectedSize = pkg.sizeBytes.takeIf { it > 0 } ?: return null
             if (!tempFile.exists() || tempFile.length() < expectedSize) return null
             if (tempFile.length() > expectedSize) {
-                return unexpectedSizeFailure(expectedSize, tempFile.length())
+                val actualSize = tempFile.length()
+                tempFile.delete()
+                return unexpectedSizeFailure(expectedSize, actualSize)
             }
             return verifyDownloadedFile()
         }
