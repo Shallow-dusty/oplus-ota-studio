@@ -60,6 +60,7 @@ fun LookupUiState.toPresentation(): LookupStatePresentation =
             label = LookupStateText(R.string.lookup_before_title),
             details = listOf(
                 LookupStateText(R.string.lookup_privacy_body),
+                LookupStateText(R.string.lookup_privacy_device_id),
                 LookupStateText(R.string.lookup_privacy_no_serial),
             ),
             canContinuePrivacy = true,

@@ -2,7 +2,8 @@
     <string name="lookup_title">OTA Lookup</string>
     <string name="lookup_before_title">Before lookup</string>
     <string name="lookup_privacy_body">This app queries OPlus servers with your device build info. The request includes the model, region, and OTA version shown below.</string>
-    <string name="lookup_privacy_no_serial">Serial and IMEI are not sent.</string>
+    <string name="lookup_privacy_device_id">When using detected device data, the request also includes a hash derived from Android ID.</string>
+    <string name="lookup_privacy_no_serial">Raw Android ID, serial, and IMEI are not sent.</string>
     <string name="lookup_continue">Continue lookup</string>
     <string name="lookup_back">Back</string>
     <string name="lookup_detecting">Detecting device...</string>

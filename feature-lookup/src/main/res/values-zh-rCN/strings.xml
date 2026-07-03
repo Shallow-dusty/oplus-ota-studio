@@ -2,7 +2,8 @@
     <string name="lookup_title">OTA 查询</string>
     <string name="lookup_before_title">查询前确认</string>
     <string name="lookup_privacy_body">本应用会把下面显示的设备构建信息发送到 OPlus 服务器，包括机型、地区和 OTA 版本。</string>
-    <string name="lookup_privacy_no_serial">不会发送序列号或 IMEI。</string>
+    <string name="lookup_privacy_device_id">使用本机检测信息时，请求还会包含由 Android ID 派生的哈希值。</string>
+    <string name="lookup_privacy_no_serial">不会发送原始 Android ID、序列号或 IMEI。</string>
     <string name="lookup_continue">继续查询</string>
     <string name="lookup_back">返回</string>
     <string name="lookup_detecting">正在检测设备...</string>

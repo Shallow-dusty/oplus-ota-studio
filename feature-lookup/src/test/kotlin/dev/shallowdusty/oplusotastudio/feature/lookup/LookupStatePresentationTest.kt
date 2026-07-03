@@ -61,6 +61,7 @@ class LookupStatePresentationTest {
         assertEquals(
             listOf(
                 LookupStateText(R.string.lookup_privacy_body),
+                LookupStateText(R.string.lookup_privacy_device_id),
                 LookupStateText(R.string.lookup_privacy_no_serial),
             ),
             presentation.details,
