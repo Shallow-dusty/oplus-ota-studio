@@ -6,6 +6,7 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.validationErrors
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 
 class LegacyOtaLookupService(
     private val protocol: LegacyOtaProtocol = LegacyOtaProtocol(),
@@ -39,6 +40,8 @@ class LegacyOtaLookupService(
                 category = OtaErrorCategory.Network,
                 raw = error.message,
             )
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: RuntimeException) {
             OtaLookupResult.Error(
                 category = OtaErrorCategory.Unknown,

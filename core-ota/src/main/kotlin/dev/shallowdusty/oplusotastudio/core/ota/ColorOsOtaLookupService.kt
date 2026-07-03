@@ -7,6 +7,7 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.validationErrors
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 
 class ColorOsOtaLookupService(
     private val protocol: ColorOsOtaProtocol = ColorOsOtaProtocol(),
@@ -39,6 +40,8 @@ class ColorOsOtaLookupService(
             }
         } catch (error: IOException) {
             OtaLookupResult.Error(OtaErrorCategory.Network, error.message)
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: RuntimeException) {
             OtaLookupResult.Error(OtaErrorCategory.Unknown, error.message)
         }

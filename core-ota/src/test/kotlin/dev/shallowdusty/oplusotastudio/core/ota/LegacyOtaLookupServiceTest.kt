@@ -5,6 +5,7 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
@@ -68,6 +69,20 @@ class LegacyOtaLookupServiceTest {
     }
 
     @Test
+    fun `rethrows lookup cancellation`() = runTest {
+        val thrown = runCatching {
+            LegacyOtaLookupService(
+                transport = FakeOtaTransport(
+                    failure = CancellationException("lookup canceled"),
+                ),
+            ).lookup(sampleProfile())
+        }.exceptionOrNull()
+
+        assertInstanceOf(CancellationException::class.java, thrown)
+        assertEquals("lookup canceled", thrown?.message)
+    }
+
+    @Test
     fun `rejects invalid profile before sending request`() = runTest {
         val transport = FakeOtaTransport(
             OtaHttpResponse(
@@ -101,8 +116,8 @@ class LegacyOtaLookupServiceTest {
         )
 
     private class FakeOtaTransport(
-        private val response: OtaHttpResponse?,
-        private val failure: IOException? = null,
+        private val response: OtaHttpResponse? = null,
+        private val failure: Exception? = null,
     ) : OtaTransport {
         constructor(failure: IOException) : this(null, failure)
 

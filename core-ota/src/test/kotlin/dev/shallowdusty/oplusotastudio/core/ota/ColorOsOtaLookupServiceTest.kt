@@ -6,6 +6,7 @@ import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
 import java.io.IOException
 import java.util.Base64
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -53,6 +54,20 @@ class ColorOsOtaLookupServiceTest {
         val error = assertInstanceOf(OtaLookupResult.Error::class.java, result)
         assertEquals(dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory.Network, error.category)
         assertEquals("dns failed", error.raw)
+    }
+
+    @Test
+    fun `rethrows ColorOS lookup cancellation`() = runTest {
+        val thrown = runCatching {
+            ColorOsOtaLookupService(
+                transport = FakeColorOsOtaTransport(responder = {
+                    throw CancellationException("lookup canceled")
+                }),
+            ).lookup(sampleProfile())
+        }.exceptionOrNull()
+
+        assertInstanceOf(CancellationException::class.java, thrown)
+        assertEquals("lookup canceled", thrown?.message)
     }
 
     private fun encryptedResponse(
