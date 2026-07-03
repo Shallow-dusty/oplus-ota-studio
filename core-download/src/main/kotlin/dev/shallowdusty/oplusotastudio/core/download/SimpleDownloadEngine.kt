@@ -568,7 +568,16 @@ class SimpleDownloadEngine(
             return storagePreflight.check(
                 packageSizeBytes = pkg.sizeBytes,
                 snapshot = snapshotProvider(),
+                existingTempBytes = preflightRetainedPartialBytes(),
             ) as? DownloadStoragePreflightResult.Failed
+        }
+
+        private fun preflightRetainedPartialBytes(): Long {
+            val expectedSize = pkg.sizeBytes.takeIf { it > 0 } ?: return 0L
+            if (!tempFile.exists() || tempFile.length() <= 0L) return 0L
+            val resumePlan = currentResumePlan() ?: return 0L
+            if (resumePlan.discardPartial) return 0L
+            return resumePlan.rangeStart.coerceIn(0L, expectedSize)
         }
 
         private fun quarantineBadFile(): File {

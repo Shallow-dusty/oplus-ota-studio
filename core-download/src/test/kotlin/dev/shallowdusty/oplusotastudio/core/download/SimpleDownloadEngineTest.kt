@@ -551,6 +551,68 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `resumed partial discounts existing bytes during storage preflight`() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 206,
+                body = "ghij",
+                headers = Headers.Builder()
+                    .add("ETag", "\"abc\"")
+                    .add("Accept-Ranges", "bytes")
+                    .build(),
+            ),
+        )
+        server.start()
+        val tempRoot = testTempRoot("resume-storage-preflight")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        tempFile.writeText("abcdef")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = null,
+        ).copy(sizeBytes = 10L)
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = "\"abc\"",
+                    lastModified = null,
+                    acceptRanges = true,
+                    state = DownloadState.Running(6L, 10L, null),
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            storagePreflight = DownloadStoragePreflight(reserveBytes = 1L),
+            storageSnapshotProvider = {
+                DownloadStorageSnapshot(
+                    tempAvailableBytes = 15L,
+                    finalAvailableBytes = 15L,
+                    tempAndFinalShareVolume = true,
+                )
+            },
+            idGenerator = { "task-1" },
+        )
+
+        val task = engine.enqueue(pkg)
+
+        val finalState = withTimeout(5.seconds) {
+            task.state.first { it is DownloadState.Failed || it == DownloadState.Unverified }
+        }
+
+        assertEquals(DownloadState.Unverified, finalState)
+        assertEquals("bytes=6-", server.takeRequest().headers["Range"])
+        assertEquals("abcdefghij", tempFile.readText())
+    }
+
+    @Test
     fun `retries server error before verified download`() = runTest {
         server.enqueue(MockResponse(code = 503, body = "try later"))
         server.enqueue(MockResponse(code = 200, body = "abc"))

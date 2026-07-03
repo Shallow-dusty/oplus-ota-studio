@@ -24,17 +24,20 @@ class DownloadStoragePreflight(
     fun check(
         packageSizeBytes: Long,
         snapshot: DownloadStorageSnapshot,
+        existingTempBytes: Long = 0L,
     ): DownloadStoragePreflightResult {
         if (packageSizeBytes <= 0L) return DownloadStoragePreflightResult.Passed
+        val retainedTempBytes = existingTempBytes.coerceIn(0L, packageSizeBytes)
+        val remainingTempBytes = packageSizeBytes - retainedTempBytes
 
         val requiredTempBytes: Long
         val requiredFinalBytes: Long
         if (snapshot.tempAndFinalShareVolume) {
-            val requiredBytes = packageSizeBytes * 2L + reserveBytes
+            val requiredBytes = remainingTempBytes + packageSizeBytes + reserveBytes
             requiredTempBytes = requiredBytes
             requiredFinalBytes = requiredBytes
         } else {
-            requiredTempBytes = packageSizeBytes + reserveBytes
+            requiredTempBytes = remainingTempBytes + reserveBytes
             requiredFinalBytes = packageSizeBytes + reserveBytes
         }
 
