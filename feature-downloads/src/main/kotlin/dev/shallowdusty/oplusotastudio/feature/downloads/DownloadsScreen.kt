@@ -126,7 +126,10 @@ private fun DownloadRowCard(
         )
         Spacer(Modifier.height(4.dp))
         when (val s = row.state) {
-            DownloadState.Queued -> StateLabel(presentation.label.asString())
+            DownloadState.Queued -> QueuedContent(
+                taskId = row.taskId,
+                onCancel = onCancel,
+            )
             is DownloadState.Running -> RunningContent(
                 state = s,
                 taskId = row.taskId,
@@ -227,6 +230,18 @@ private fun VerifiedContent() {
 @Composable
 private fun StateLabel(text: String, color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = color, fontWeight = FontWeight.Medium)
+}
+
+@Composable
+private fun QueuedContent(
+    taskId: String,
+    onCancel: (String) -> Unit,
+) {
+    val presentation = DownloadState.Queued.toPresentation()
+    StateLabel(presentation.label.asString())
+    TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.downloads_cancel))
+    }
 }
 
 @Composable
