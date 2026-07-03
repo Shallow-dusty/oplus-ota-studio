@@ -12,6 +12,7 @@ import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferencesStore
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
+import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
 import dev.shallowdusty.oplusotastudio.core.model.StoredDownloadTask
@@ -259,6 +260,67 @@ class AppGraphTest {
     }
 
     @Test
+    fun `cleans terminal stored task parts while keeping recoverable task parts`() = runTest {
+        val tempRoot = testTempRoot("app-graph-janitor-terminal")
+        val runningPart = tempRoot.resolve("running.zip.part").also { it.writeText("running") }
+        val retryableFailedPart = tempRoot.resolve("retryable-failed.zip.part").also { it.writeText("retryable") }
+        val terminalPart = tempRoot.resolve("terminal.zip.part").also { it.writeText("terminal") }
+        val exhaustedFailedPart = tempRoot.resolve("exhausted-failed.zip.part").also { it.writeText("exhausted") }
+        val store = RecordingDownloadTaskStore(
+            observedTasks = listOf(
+                storedTask(
+                    taskId = "running",
+                    tempFilePath = runningPart.path,
+                    state = DownloadState.Running(
+                        downloadedBytes = 1L,
+                        targetSize = 3L,
+                        speedBytesPerSec = null,
+                    ),
+                ),
+                storedTask(
+                    taskId = "retryable-failed",
+                    tempFilePath = retryableFailedPart.path,
+                    state = DownloadState.Failed(
+                        category = OtaErrorCategory.Network,
+                        retriesRemaining = 1,
+                        raw = "timeout",
+                    ),
+                ),
+                storedTask(
+                    taskId = "terminal",
+                    tempFilePath = terminalPart.path,
+                    state = DownloadState.Verified,
+                ),
+                storedTask(
+                    taskId = "exhausted-failed",
+                    tempFilePath = exhaustedFailedPart.path,
+                    state = DownloadState.Failed(
+                        category = OtaErrorCategory.Network,
+                        retriesRemaining = 0,
+                        raw = "timeout",
+                    ),
+                ),
+            ),
+        )
+        val graph = AppGraph(
+            downloadTempRoot = tempRoot,
+            downloadTaskStore = store,
+            downloadTempFileJanitor = DownloadTempFileJanitor(listOf(tempRoot)),
+        )
+
+        val result = graph.cleanOrphanedDownloadParts()
+
+        assertTrue(runningPart.exists())
+        assertTrue(retryableFailedPart.exists())
+        assertFalse(terminalPart.exists())
+        assertFalse(exhaustedFailedPart.exists())
+        assertEquals(
+            setOf(terminalPart.absolutePath, exhaustedFailedPart.absolutePath),
+            result?.deletedPaths?.toSet(),
+        )
+    }
+
+    @Test
     fun `startup maintenance cleans parts and reschedules recoverable downloads`() = runTest {
         val tempRoot = testTempRoot("app-graph-startup-maintenance")
         val activePart = tempRoot.resolve("active.zip.part").also { it.writeText("active") }
@@ -378,11 +440,12 @@ class AppGraphTest {
     }
 
     private fun storedTask(
+        taskId: String = "task-1",
         tempFilePath: String,
         state: DownloadState = DownloadState.Queued,
     ): StoredDownloadTask =
         StoredDownloadTask(
-            taskId = "task-1",
+            taskId = taskId,
             pkg = OtaPackage(
                 versionName = "test",
                 type = "full",

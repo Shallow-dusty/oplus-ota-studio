@@ -9,6 +9,7 @@ import dev.shallowdusty.oplusotastudio.core.download.SimpleDownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
 import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferencesStore
+import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.model.AlwaysAcceptedLookupPrivacyConsentStore
 import dev.shallowdusty.oplusotastudio.core.model.LookupPrivacyConsentStore
@@ -110,6 +111,7 @@ class AppGraph(
         val janitor = downloadTempFileJanitor ?: return null
         val activeTempFilePaths = store.observeTasks()
             .first()
+            .filterNot { it.state.isTerminal }
             .mapTo(mutableSetOf()) { it.tempFilePath }
         return janitor.deleteOrphanedParts(activeTempFilePaths)
     }
@@ -129,3 +131,12 @@ class AppGraph(
             }
     }
 }
+
+private val DownloadState.isTerminal: Boolean
+    get() = when (val state = this) {
+        DownloadState.Canceled,
+        DownloadState.Verified,
+        DownloadState.Unverified -> true
+        is DownloadState.Failed -> state.retriesRemaining <= 0
+        else -> false
+    }
