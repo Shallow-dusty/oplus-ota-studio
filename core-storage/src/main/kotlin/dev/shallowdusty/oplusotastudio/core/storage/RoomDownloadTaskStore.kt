@@ -58,14 +58,12 @@ class RoomDownloadTaskStore(
         acceptRanges: Boolean,
         updatedAtMs: Long,
     ) {
-        val current = downloadTaskDao.get(taskId) ?: return
-        downloadTaskDao.upsert(
-            current.copy(
-                etag = etag,
-                lastModified = lastModified,
-                acceptRanges = acceptRanges,
-                updatedAtMs = updatedAtMs,
-            ),
+        downloadTaskDao.updateResumeMetadataColumns(
+            taskId = taskId,
+            etag = etag,
+            lastModified = lastModified,
+            acceptRanges = acceptRanges,
+            updatedAtMs = updatedAtMs,
         )
     }
 
@@ -74,12 +72,10 @@ class RoomDownloadTaskStore(
         finalFilePath: String,
         updatedAtMs: Long,
     ) {
-        val current = downloadTaskDao.get(taskId) ?: return
-        downloadTaskDao.upsert(
-            current.copy(
-                finalFilePath = finalFilePath,
-                updatedAtMs = updatedAtMs,
-            ),
+        downloadTaskDao.updateFinalFilePathColumn(
+            taskId = taskId,
+            finalFilePath = finalFilePath,
+            updatedAtMs = updatedAtMs,
         )
     }
 

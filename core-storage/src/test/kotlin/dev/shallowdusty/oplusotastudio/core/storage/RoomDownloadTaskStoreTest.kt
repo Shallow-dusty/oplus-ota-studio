@@ -109,7 +109,7 @@ class RoomDownloadTaskStoreTest {
                 updatedAtMs = 100L,
             ),
         )
-        dao.beforeStateWrite = {
+        dao.beforeWrite = {
             dao.rows.value = dao.rows.value.map { row ->
                 row.withState(
                     state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),
@@ -146,7 +146,7 @@ class RoomDownloadTaskStoreTest {
                 updatedAtMs = 100L,
             ),
         )
-        dao.beforeStateWrite = {
+        dao.beforeWrite = {
             dao.rows.value = emptyList()
         }
 
@@ -212,13 +212,77 @@ class RoomDownloadTaskStoreTest {
             updatedAtMs = 200L,
         )
 
-        val saved = dao.upserts.single()
+        val saved = dao.rows.value.single()
         assertEquals("\"abc\"", saved.etag)
         assertEquals("Tue, 30 Jun 2026 00:00:00 GMT", saved.lastModified)
         assertEquals(true, saved.acceptRanges)
         assertEquals("Running", saved.state)
         assertEquals(128L, saved.downloadedBytes)
         assertEquals(200L, saved.updatedAtMs)
+    }
+
+    @Test
+    fun `updateResumeMetadata does not overwrite user pause written during metadata race`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ).withState(
+                state = DownloadState.Running(128L, 1024L, 64L),
+                updatedAtMs = 150L,
+            ),
+        )
+        dao.beforeWrite = {
+            dao.rows.value = dao.rows.value.map { row ->
+                row.withState(
+                    state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+                    updatedAtMs = 175L,
+                )
+            }
+        }
+
+        store.updateResumeMetadata(
+            taskId = "task-1",
+            etag = "\"abc\"",
+            lastModified = "Tue, 30 Jun 2026 00:00:00 GMT",
+            acceptRanges = true,
+            updatedAtMs = 200L,
+        )
+
+        val task = store.getTask("task-1")
+        assertEquals(DownloadState.Paused(DownloadState.Paused.PauseReason.User), task?.state)
+        assertEquals("\"abc\"", task?.etag)
+    }
+
+    @Test
+    fun `updateResumeMetadata does not recreate task deleted during metadata race`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ),
+        )
+        dao.beforeWrite = {
+            dao.rows.value = emptyList()
+        }
+
+        store.updateResumeMetadata(
+            taskId = "task-1",
+            etag = "\"abc\"",
+            lastModified = "Tue, 30 Jun 2026 00:00:00 GMT",
+            acceptRanges = true,
+            updatedAtMs = 200L,
+        )
+
+        assertNull(store.getTask("task-1"))
     }
 
     @Test
@@ -243,10 +307,70 @@ class RoomDownloadTaskStoreTest {
             updatedAtMs = 200L,
         )
 
-        val saved = dao.upserts.single()
+        val saved = dao.rows.value.single()
         assertEquals("content://media/external/downloads/42", saved.finalFilePath)
         assertEquals("Verified", saved.state)
         assertEquals(200L, saved.updatedAtMs)
+    }
+
+    @Test
+    fun `updateFinalFilePath does not overwrite user pause written during final path race`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ).withState(
+                state = DownloadState.Running(128L, 1024L, 64L),
+                updatedAtMs = 150L,
+            ),
+        )
+        dao.beforeWrite = {
+            dao.rows.value = dao.rows.value.map { row ->
+                row.withState(
+                    state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+                    updatedAtMs = 175L,
+                )
+            }
+        }
+
+        store.updateFinalFilePath(
+            taskId = "task-1",
+            finalFilePath = "content://media/external/downloads/42",
+            updatedAtMs = 200L,
+        )
+
+        val task = store.getTask("task-1")
+        assertEquals(DownloadState.Paused(DownloadState.Paused.PauseReason.User), task?.state)
+        assertEquals("content://media/external/downloads/42", task?.finalFilePath)
+    }
+
+    @Test
+    fun `updateFinalFilePath does not recreate task deleted during final path race`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ),
+        )
+        dao.beforeWrite = {
+            dao.rows.value = emptyList()
+        }
+
+        store.updateFinalFilePath(
+            taskId = "task-1",
+            finalFilePath = "content://media/external/downloads/42",
+            updatedAtMs = 200L,
+        )
+
+        assertNull(store.getTask("task-1"))
     }
 
     @Test
@@ -331,10 +455,10 @@ class RoomDownloadTaskStoreTest {
     private class FakeDownloadTaskDao : DownloadTaskDao {
         val rows = MutableStateFlow<List<DownloadTaskEntity>>(emptyList())
         val upserts = mutableListOf<DownloadTaskEntity>()
-        var beforeStateWrite: (() -> Unit)? = null
+        var beforeWrite: (() -> Unit)? = null
 
         override suspend fun upsert(task: DownloadTaskEntity) {
-            runBeforeStateWrite()
+            runBeforeWrite()
             upserts += task
             rows.value = rows.value.filterNot { it.taskId == task.taskId } + task
         }
@@ -361,7 +485,7 @@ class RoomDownloadTaskStoreTest {
             updatedAtMs: Long,
             canOverrideUserPause: Boolean,
         ): Int {
-            runBeforeStateWrite()
+            runBeforeWrite()
             val current = rows.value.firstOrNull { it.taskId == taskId } ?: return 0
             if (!canOverrideUserPause && current.state == "Paused" && current.pauseReason == "User") {
                 return 0
@@ -387,13 +511,51 @@ class RoomDownloadTaskStoreTest {
             return 1
         }
 
+        override suspend fun updateResumeMetadataColumns(
+            taskId: String,
+            etag: String?,
+            lastModified: String?,
+            acceptRanges: Boolean,
+            updatedAtMs: Long,
+        ): Int {
+            runBeforeWrite()
+            val current = rows.value.firstOrNull { it.taskId == taskId } ?: return 0
+            val updated = current.copy(
+                etag = etag,
+                lastModified = lastModified,
+                acceptRanges = acceptRanges,
+                updatedAtMs = updatedAtMs,
+            )
+            rows.value = rows.value.map { row ->
+                if (row.taskId == taskId) updated else row
+            }
+            return 1
+        }
+
+        override suspend fun updateFinalFilePathColumn(
+            taskId: String,
+            finalFilePath: String,
+            updatedAtMs: Long,
+        ): Int {
+            runBeforeWrite()
+            val current = rows.value.firstOrNull { it.taskId == taskId } ?: return 0
+            val updated = current.copy(
+                finalFilePath = finalFilePath,
+                updatedAtMs = updatedAtMs,
+            )
+            rows.value = rows.value.map { row ->
+                if (row.taskId == taskId) updated else row
+            }
+            return 1
+        }
+
         override suspend fun delete(taskId: String) {
             rows.value = rows.value.filterNot { it.taskId == taskId }
         }
 
-        private fun runBeforeStateWrite() {
-            val hook = beforeStateWrite ?: return
-            beforeStateWrite = null
+        private fun runBeforeWrite() {
+            val hook = beforeWrite ?: return
+            beforeWrite = null
             hook()
         }
     }

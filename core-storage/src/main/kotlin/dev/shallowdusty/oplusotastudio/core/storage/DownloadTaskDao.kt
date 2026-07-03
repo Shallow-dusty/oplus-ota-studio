@@ -60,6 +60,40 @@ interface DownloadTaskDao {
         canOverrideUserPause: Boolean,
     ): Int
 
+    @Query(
+        """
+        UPDATE download_tasks
+        SET
+            etag = :etag,
+            lastModified = :lastModified,
+            acceptRanges = :acceptRanges,
+            updatedAtMs = :updatedAtMs
+        WHERE taskId = :taskId
+        """,
+    )
+    suspend fun updateResumeMetadataColumns(
+        taskId: String,
+        etag: String?,
+        lastModified: String?,
+        acceptRanges: Boolean,
+        updatedAtMs: Long,
+    ): Int
+
+    @Query(
+        """
+        UPDATE download_tasks
+        SET
+            finalFilePath = :finalFilePath,
+            updatedAtMs = :updatedAtMs
+        WHERE taskId = :taskId
+        """,
+    )
+    suspend fun updateFinalFilePathColumn(
+        taskId: String,
+        finalFilePath: String,
+        updatedAtMs: Long,
+    ): Int
+
     @Query("DELETE FROM download_tasks WHERE taskId = :taskId")
     suspend fun delete(taskId: String)
 }
