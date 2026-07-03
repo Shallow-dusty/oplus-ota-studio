@@ -405,13 +405,13 @@ class SimpleDownloadEngine(
         private suspend fun verifyDownloadedFile(): DownloadAttemptOutcome {
             if (isUserStopped()) return DownloadAttemptOutcome.Finished
             updateState(DownloadState.Verifying)
-            when (
-                val result = checksumVerifier.verify(
-                    file = tempFile,
-                    expectedSha256 = pkg.sha256,
-                    expectedMd5 = pkg.md5,
-                )
-            ) {
+            val result = checksumVerifier.verify(
+                file = tempFile,
+                expectedSha256 = pkg.sha256,
+                expectedMd5 = pkg.md5,
+            )
+            if (isUserStopped()) return DownloadAttemptOutcome.Finished
+            when (result) {
                 is ChecksumResult.Verified -> {
                     try {
                         promoteVerifiedFile()

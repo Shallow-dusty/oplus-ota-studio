@@ -428,6 +428,57 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `stored task stops before promoting when stopped during verification`() = runTest {
+        server.start()
+        val tempRoot = testTempRoot("stop-during-verification")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        tempFile.writeText("abc")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        lateinit var engine: SimpleDownloadEngine
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = DownloadState.Running(3L, 3L, null),
+                    updatedAtMs = 100L,
+                ),
+            ),
+            onStateUpdate = { taskId, state ->
+                if (state == DownloadState.Verifying) {
+                    engine.stopStoredTask(taskId)
+                }
+            },
+        )
+        val promoter = RecordingDownloadFilePromoter("content://downloads/pkg.zip")
+        val packageRepository = RecordingPackageRepository()
+        engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            filePromoter = promoter,
+            packageRepository = packageRepository,
+        )
+
+        val finalState = engine.executeStoredTask("task-1")
+
+        assertEquals(DownloadState.Verifying, finalState)
+        assertTrue(promoter.promotions.isEmpty())
+        assertTrue(store.finalPaths.isEmpty())
+        assertTrue(packageRepository.downloaded.isEmpty())
+        assertFalse(store.updates.any { it.state == DownloadState.Verified })
+    }
+
+    @Test
     fun `promotion io failure becomes file failure without retrying download`() = runTest {
         server.enqueue(MockResponse(code = 200, body = "abc"))
         server.start()
@@ -1569,6 +1620,7 @@ class SimpleDownloadEngineTest {
 
     private class RecordingDownloadTaskStore(
         private val existingTasks: Map<String, StoredDownloadTask> = emptyMap(),
+        private val onStateUpdate: (String, DownloadState) -> Unit = { _, _ -> },
     ) : DownloadTaskStore {
         val created = mutableListOf<CreatedTask>()
         val updates = CopyOnWriteArrayList<StateUpdate>()
@@ -1591,6 +1643,7 @@ class SimpleDownloadEngineTest {
             updatedAtMs: Long,
         ) {
             updates += StateUpdate(taskId, state)
+            onStateUpdate(taskId, state)
         }
 
         override suspend fun updateResumeMetadata(
