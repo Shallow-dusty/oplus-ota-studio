@@ -117,7 +117,7 @@ private fun DownloadTaskEntity.toStoredDownloadTask(): StoredDownloadTask =
 private fun DownloadState.canOverrideUserPause(): Boolean =
     when (this) {
         DownloadState.Canceled,
-        DownloadState.Queued,
-        is DownloadState.Paused -> true
+        DownloadState.Queued -> true
+        is DownloadState.Paused -> reason == DownloadState.Paused.PauseReason.User
         else -> false
     }
