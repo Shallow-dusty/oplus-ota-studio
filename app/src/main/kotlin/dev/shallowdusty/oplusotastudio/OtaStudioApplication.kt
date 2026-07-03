@@ -8,6 +8,7 @@ import androidx.work.WorkManager
 import dev.shallowdusty.oplusotastudio.core.download.DownloadTempFileJanitor
 import dev.shallowdusty.oplusotastudio.core.download.DownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.download.MutableDownloadAdmissionGate
+import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.storage.OtaStudioDatabase
 import dev.shallowdusty.oplusotastudio.core.storage.RoomDownloadTaskStore
 import dev.shallowdusty.oplusotastudio.core.storage.RoomPackageRepository
@@ -78,9 +79,17 @@ class OtaStudioApplication : Application(), DownloadWorkerExecutorProvider {
             downloadFilePromoter = AndroidMediaStoreDownloadFilePromoter(this),
             storageSnapshotProvider = AndroidDownloadStorageSnapshotProvider(this, downloadTempRoot),
             downloadTempFileJanitor = DownloadTempFileJanitor(downloadTempRoots),
-            downloadAdmissionGate = DownloadAdmissionGate {
-                downloadAdmissionGate.rejectionReason()
-                    ?: batteryAdmissionGate.rejectionReason()
+            downloadAdmissionGate = object : DownloadAdmissionGate {
+                override fun rejectionReason(): String? =
+                    downloadAdmissionGate.rejectionReason()
+                        ?: batteryAdmissionGate.rejectionReason()
+
+                override fun rejectionPauseReason(): DownloadState.Paused.PauseReason? =
+                    if (downloadAdmissionGate.rejectionReason() != null) {
+                        downloadAdmissionGate.rejectionPauseReason()
+                    } else {
+                        batteryAdmissionGate.rejectionPauseReason()
+                    }
             },
             downloadWorkScheduler = DownloadWorkScheduler(
                 preferencesStore = downloadPreferencesStore,

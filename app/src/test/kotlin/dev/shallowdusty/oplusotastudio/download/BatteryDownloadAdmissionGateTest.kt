@@ -2,6 +2,7 @@ package dev.shallowdusty.oplusotastudio.download
 
 import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferences
 import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferencesStore
+import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -29,12 +30,15 @@ class BatteryDownloadAdmissionGateTest {
             "Battery is below 20%; new downloads are paused.",
             gate.rejectionReason(),
         )
+        assertEquals(DownloadState.Paused.PauseReason.BatteryLow, gate.rejectionPauseReason())
 
         battery.snapshot = BatterySnapshot(levelPercent = 20, isCharging = false)
         assertNull(gate.rejectionReason())
+        assertNull(gate.rejectionPauseReason())
 
         battery.snapshot = BatterySnapshot(levelPercent = 5, isCharging = true)
         assertNull(gate.rejectionReason())
+        assertNull(gate.rejectionPauseReason())
     }
 
     @Test

@@ -1,5 +1,6 @@
 package dev.shallowdusty.oplusotastudio.download
 
+import dev.shallowdusty.oplusotastudio.core.download.DownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.download.MutableDownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import dev.shallowdusty.oplusotastudio.core.model.DownloadTaskStore
@@ -91,6 +92,33 @@ class WorkScheduledDownloadEngineTest {
         val persistedFailed = persisted.state.first() as DownloadState.Failed
         assertEquals(failed, persistedFailed)
         assertEquals("rejected", store.created.single().taskId)
+        assertTrue(scheduler.scheduled.isEmpty())
+    }
+
+    @Test
+    fun `enqueue stores battery gate rejections as recoverable paused tasks`() = runTest {
+        val store = RecordingDownloadTaskStore()
+        val scheduler = RecordingDownloadWorkScheduler()
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/battery-paused"),
+            idGenerator = { "battery-paused" },
+            admissionGate = object : DownloadAdmissionGate {
+                override fun rejectionReason(): String = "Battery is below 20%; new downloads are paused."
+
+                override fun rejectionPauseReason(): DownloadState.Paused.PauseReason =
+                    DownloadState.Paused.PauseReason.BatteryLow
+            },
+        )
+
+        val task = engine.enqueue(samplePackage())
+
+        val paused = DownloadState.Paused(DownloadState.Paused.PauseReason.BatteryLow)
+        assertEquals(paused, task.state.first())
+        val persisted = engine.observeAll().first().single()
+        assertEquals(paused, persisted.state.first())
+        assertEquals("battery-paused", store.created.single().taskId)
         assertTrue(scheduler.scheduled.isEmpty())
     }
 

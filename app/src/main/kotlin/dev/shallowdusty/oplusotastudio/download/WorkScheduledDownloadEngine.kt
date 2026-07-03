@@ -30,12 +30,22 @@ class WorkScheduledDownloadEngine(
         val taskId = idGenerator()
         val tempFile = tempRoot.resolve("$taskId.zip.part")
         admissionGate.rejectionReason()?.let { reason ->
-            return rejectAndPersist(
-                taskId = taskId,
-                pkg = pkg,
-                tempFile = tempFile,
-                raw = reason,
-            )
+            val pauseReason = admissionGate.rejectionPauseReason()
+            return if (pauseReason != null) {
+                pauseAndPersist(
+                    taskId = taskId,
+                    pkg = pkg,
+                    tempFile = tempFile,
+                    reason = pauseReason,
+                )
+            } else {
+                rejectAndPersist(
+                    taskId = taskId,
+                    pkg = pkg,
+                    tempFile = tempFile,
+                    raw = reason,
+                )
+            }
         }
         val activeTasks = taskStore.observeTasks()
             .first()
@@ -121,6 +131,26 @@ class WorkScheduledDownloadEngine(
             private suspend fun currentState(): DownloadState? =
                 taskStore.getTask(taskId)?.state
         }
+
+    private suspend fun pauseAndPersist(
+        taskId: String,
+        pkg: OtaPackage,
+        tempFile: File,
+        reason: DownloadState.Paused.PauseReason,
+    ): DownloadTask {
+        taskStore.createQueuedTask(
+            taskId = taskId,
+            pkg = pkg,
+            tempFilePath = tempFile.path,
+            updatedAtMs = nowMs(),
+        )
+        taskStore.updateState(
+            taskId = taskId,
+            state = DownloadState.Paused(reason),
+            updatedAtMs = nowMs(),
+        )
+        return storedTaskHandle(taskId, tempFile)
+    }
 
     private suspend fun rejectAndPersist(
         taskId: String,

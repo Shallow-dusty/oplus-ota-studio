@@ -1,7 +1,11 @@
 package dev.shallowdusty.oplusotastudio.core.download
 
+import dev.shallowdusty.oplusotastudio.core.model.DownloadState
+
 fun interface DownloadAdmissionGate {
     fun rejectionReason(): String?
+
+    fun rejectionPauseReason(): DownloadState.Paused.PauseReason? = null
 
     companion object {
         val AllowAll = DownloadAdmissionGate { null }

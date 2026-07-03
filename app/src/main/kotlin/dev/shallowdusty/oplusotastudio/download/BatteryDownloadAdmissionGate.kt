@@ -6,6 +6,7 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import dev.shallowdusty.oplusotastudio.core.download.DownloadAdmissionGate
 import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferencesStore
+import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +58,9 @@ class BatteryDownloadAdmissionGate(
         if (threshold <= 0 || snapshot.levelPercent >= threshold) return null
         return "Battery is below $threshold%; new downloads are paused."
     }
+
+    override fun rejectionPauseReason(): DownloadState.Paused.PauseReason? =
+        if (rejectionReason() != null) DownloadState.Paused.PauseReason.BatteryLow else null
 
     private fun currentThresholdPercent(): Int {
         val preferences = preferencesStore.preferences
