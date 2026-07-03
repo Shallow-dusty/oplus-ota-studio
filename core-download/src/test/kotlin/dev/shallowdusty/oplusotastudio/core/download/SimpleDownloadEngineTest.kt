@@ -296,7 +296,7 @@ class SimpleDownloadEngineTest {
             samplePackage(
                 url = server.url("/pkg.zip").toString(),
                 md5 = "b67a5f55dade2839f62150d7353fdf03",
-            ),
+            ).copy(sizeBytes = body.length.toLong()),
         )
 
         withTimeout(5.seconds) {
@@ -329,7 +329,7 @@ class SimpleDownloadEngineTest {
             samplePackage(
                 url = server.url("/pkg.zip").toString(),
                 md5 = "b67a5f55dade2839f62150d7353fdf03",
-            ),
+            ).copy(sizeBytes = body.length.toLong()),
         )
 
         withTimeout(5.seconds) {
@@ -1329,6 +1329,37 @@ class SimpleDownloadEngineTest {
         assertTrue(failed.raw?.contains("expected 4 bytes, got 3") == true)
         assertEquals("bytes=2-", server.takeRequest().headers["Range"])
         assertFalse(store.updates.any { it.state == DownloadState.Unverified })
+    }
+
+    @Test
+    fun `known-size download with extra bytes fails before unverified promotion`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abcd"))
+        server.start()
+        val promoter = RecordingDownloadFilePromoter("content://downloads/pkg.zip")
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = testTempRoot("oversized-known-size"),
+            scope = backgroundScope,
+            filePromoter = promoter,
+            maxAttempts = 1,
+        )
+
+        val task = engine.enqueue(
+            samplePackage(
+                url = server.url("/pkg.zip").toString(),
+                md5 = null,
+            ),
+        )
+
+        val finalState = withTimeout(5.seconds) {
+            task.state.first { it is DownloadState.Failed || it == DownloadState.Unverified }
+        }
+
+        val failed = finalState as DownloadState.Failed
+        assertEquals(OtaErrorCategory.Network, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertTrue(failed.raw?.contains("expected 3 bytes, got 4") == true)
+        assertTrue(promoter.promotions.isEmpty())
     }
 
     @Test

@@ -389,6 +389,9 @@ class SimpleDownloadEngine(
                         raw = "Incomplete download: expected $expectedSize bytes, got $downloaded",
                     )
                 }
+                if (downloaded > expectedSize) {
+                    return unexpectedSizeFailure(expectedSize, downloaded)
+                }
             }
             return verifyDownloadedFile()
         }
@@ -397,10 +400,16 @@ class SimpleDownloadEngine(
             val expectedSize = pkg.sizeBytes.takeIf { it > 0 } ?: return null
             if (!tempFile.exists() || tempFile.length() < expectedSize) return null
             if (tempFile.length() > expectedSize) {
-                tempFile.truncateTo(expectedSize)
+                return unexpectedSizeFailure(expectedSize, tempFile.length())
             }
             return verifyDownloadedFile()
         }
+
+        private fun unexpectedSizeFailure(expectedSize: Long, actualSize: Long): DownloadAttemptOutcome.Failed =
+            DownloadAttemptOutcome.Failed(
+                category = OtaErrorCategory.Network,
+                raw = "Unexpected download size: expected $expectedSize bytes, got $actualSize",
+            )
 
         private suspend fun verifyDownloadedFile(): DownloadAttemptOutcome {
             if (isUserStopped()) return DownloadAttemptOutcome.Finished
