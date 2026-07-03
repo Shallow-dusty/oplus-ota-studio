@@ -147,6 +147,8 @@ class SimpleDownloadEngine(
         private var pauseRequested = false
         @Volatile
         private var stopRequested = false
+        @Volatile
+        private var stopPersistenceJob: Job? = null
         private var resumeMetadata = storedTask?.let {
             StoredResumeMetadata(
                 etag = it.etag,
@@ -167,6 +169,7 @@ class SimpleDownloadEngine(
             try {
                 runDownload()
             } finally {
+                stopPersistenceJob?.join()
                 finishTask(this@SimpleDownloadTask)
             }
             return _state.value
@@ -200,7 +203,10 @@ class SimpleDownloadEngine(
         }
 
         fun stopActiveTransfer() {
+            val paused = DownloadState.Paused(DownloadState.Paused.PauseReason.NetworkLost)
             stopRequested = true
+            _state.value = paused
+            stopPersistenceJob = scope.launch { persistState(paused) }
             currentCall?.cancel()
             job?.cancel()
         }
@@ -544,6 +550,10 @@ class SimpleDownloadEngine(
 
         private suspend fun updateState(state: DownloadState) {
             _state.value = state
+            persistState(state)
+        }
+
+        private suspend fun persistState(state: DownloadState) {
             taskStore?.updateState(
                 taskId = taskId,
                 state = state,

@@ -428,7 +428,7 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
-    fun `stored task stops before promoting when stopped during verification`() = runTest {
+    fun `stored task pauses before promoting when stopped during verification`() = runTest {
         server.start()
         val tempRoot = testTempRoot("stop-during-verification")
         val tempFile = tempRoot.resolve("task-1.zip.part")
@@ -471,10 +471,12 @@ class SimpleDownloadEngineTest {
 
         val finalState = engine.executeStoredTask("task-1")
 
-        assertEquals(DownloadState.Verifying, finalState)
+        val expectedPaused = DownloadState.Paused(DownloadState.Paused.PauseReason.NetworkLost)
+        assertEquals(expectedPaused, finalState)
         assertTrue(promoter.promotions.isEmpty())
         assertTrue(store.finalPaths.isEmpty())
         assertTrue(packageRepository.downloaded.isEmpty())
+        assertEquals(expectedPaused, store.updates.last().state)
         assertFalse(store.updates.any { it.state == DownloadState.Verified })
     }
 
@@ -752,7 +754,7 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
-    fun `stopStoredTask cancels active persisted download without verifying partial file`() = runTest {
+    fun `stopStoredTask pauses active persisted download without verifying partial file`() = runTest {
         val body = "abcdef"
         server.enqueue(
             MockResponse.Builder()
@@ -804,7 +806,9 @@ class SimpleDownloadEngineTest {
             withTimeout(5.seconds) { execution.await() }
         }
 
-        assertTrue(finalState is DownloadState.Running)
+        val expectedPaused = DownloadState.Paused(DownloadState.Paused.PauseReason.NetworkLost)
+        assertEquals(expectedPaused, finalState)
+        assertEquals(expectedPaused, store.updates.last().state)
         assertTrue(store.updates.none { it.state == DownloadState.Verifying })
         assertTrue(store.updates.none { it.state == DownloadState.Verified })
         assertTrue(tempFile.length() < body.length)
