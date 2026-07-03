@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 class RoomDownloadTaskStoreTest {
@@ -54,7 +55,7 @@ class RoomDownloadTaskStoreTest {
             updatedAtMs = 200L,
         )
 
-        val saved = dao.upserts.single()
+        val saved = dao.rows.value.single()
         assertEquals("task-1", saved.taskId)
         assertEquals("Failed", saved.state)
         assertEquals("Network", saved.errorCategory)
@@ -94,6 +95,72 @@ class RoomDownloadTaskStoreTest {
             DownloadState.Paused(DownloadState.Paused.PauseReason.User),
             store.getTask("task-1")?.state,
         )
+    }
+
+    @Test
+    fun `updateState does not overwrite user pause written during worker state race`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ),
+        )
+        dao.beforeStateWrite = {
+            dao.rows.value = dao.rows.value.map { row ->
+                row.withState(
+                    state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+                    updatedAtMs = 150L,
+                )
+            }
+        }
+
+        store.updateState(
+            taskId = "task-1",
+            state = DownloadState.Running(
+                downloadedBytes = 128L,
+                targetSize = 1024L,
+                speedBytesPerSec = 64L,
+            ),
+            updatedAtMs = 200L,
+        )
+
+        assertEquals(
+            DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+            store.getTask("task-1")?.state,
+        )
+    }
+
+    @Test
+    fun `updateState does not recreate task deleted during worker state race`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ),
+        )
+        dao.beforeStateWrite = {
+            dao.rows.value = emptyList()
+        }
+
+        store.updateState(
+            taskId = "task-1",
+            state = DownloadState.Running(
+                downloadedBytes = 128L,
+                targetSize = 1024L,
+                speedBytesPerSec = 64L,
+            ),
+            updatedAtMs = 200L,
+        )
+
+        assertNull(store.getTask("task-1"))
     }
 
     @Test
@@ -264,8 +331,10 @@ class RoomDownloadTaskStoreTest {
     private class FakeDownloadTaskDao : DownloadTaskDao {
         val rows = MutableStateFlow<List<DownloadTaskEntity>>(emptyList())
         val upserts = mutableListOf<DownloadTaskEntity>()
+        var beforeStateWrite: (() -> Unit)? = null
 
         override suspend fun upsert(task: DownloadTaskEntity) {
+            runBeforeStateWrite()
             upserts += task
             rows.value = rows.value.filterNot { it.taskId == task.taskId } + task
         }
@@ -275,8 +344,57 @@ class RoomDownloadTaskStoreTest {
         override suspend fun get(taskId: String): DownloadTaskEntity? =
             rows.value.firstOrNull { it.taskId == taskId }
 
+        override suspend fun updateStateColumns(
+            taskId: String,
+            downloadedBytes: Long,
+            targetSize: Long?,
+            speedBytesPerSec: Long?,
+            state: String,
+            pauseReason: String?,
+            retryAttempt: Int?,
+            maxRetryAttempts: Int?,
+            errorCategory: String?,
+            retriesRemaining: Int?,
+            rawError: String?,
+            expectedHash: String?,
+            actualHash: String?,
+            updatedAtMs: Long,
+            canOverrideUserPause: Boolean,
+        ): Int {
+            runBeforeStateWrite()
+            val current = rows.value.firstOrNull { it.taskId == taskId } ?: return 0
+            if (!canOverrideUserPause && current.state == "Paused" && current.pauseReason == "User") {
+                return 0
+            }
+            val updated = current.copy(
+                downloadedBytes = downloadedBytes,
+                targetSize = targetSize,
+                speedBytesPerSec = speedBytesPerSec,
+                state = state,
+                pauseReason = pauseReason,
+                retryAttempt = retryAttempt,
+                maxRetryAttempts = maxRetryAttempts,
+                errorCategory = errorCategory,
+                retriesRemaining = retriesRemaining,
+                rawError = rawError,
+                expectedHash = expectedHash,
+                actualHash = actualHash,
+                updatedAtMs = updatedAtMs,
+            )
+            rows.value = rows.value.map { row ->
+                if (row.taskId == taskId) updated else row
+            }
+            return 1
+        }
+
         override suspend fun delete(taskId: String) {
             rows.value = rows.value.filterNot { it.taskId == taskId }
+        }
+
+        private fun runBeforeStateWrite() {
+            val hook = beforeStateWrite ?: return
+            beforeStateWrite = null
+            hook()
         }
     }
 }

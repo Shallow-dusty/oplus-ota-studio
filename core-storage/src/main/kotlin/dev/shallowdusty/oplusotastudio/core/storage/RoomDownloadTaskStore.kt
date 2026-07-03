@@ -31,11 +31,24 @@ class RoomDownloadTaskStore(
         state: DownloadState,
         updatedAtMs: Long,
     ) {
-        val current = downloadTaskDao.get(taskId) ?: return
-        if (current.toDownloadState().isUserPaused() && !state.canOverrideUserPause()) {
-            return
-        }
-        downloadTaskDao.upsert(current.withState(state, updatedAtMs))
+        val columns = DownloadStateStorageCodec.toColumns(state)
+        downloadTaskDao.updateStateColumns(
+            taskId = taskId,
+            downloadedBytes = columns.downloadedBytes,
+            targetSize = columns.targetSize,
+            speedBytesPerSec = columns.speedBytesPerSec,
+            state = columns.state,
+            pauseReason = columns.pauseReason,
+            retryAttempt = columns.retryAttempt,
+            maxRetryAttempts = columns.maxRetryAttempts,
+            errorCategory = columns.errorCategory,
+            retriesRemaining = columns.retriesRemaining,
+            rawError = columns.rawError,
+            expectedHash = columns.expectedHash,
+            actualHash = columns.actualHash,
+            updatedAtMs = updatedAtMs,
+            canOverrideUserPause = state.canOverrideUserPause(),
+        )
     }
 
     override suspend fun updateResumeMetadata(
@@ -104,9 +117,6 @@ private fun DownloadTaskEntity.toStoredDownloadTask(): StoredDownloadTask =
         state = toDownloadState(),
         updatedAtMs = updatedAtMs,
     )
-
-private fun DownloadState.isUserPaused(): Boolean =
-    this == DownloadState.Paused(DownloadState.Paused.PauseReason.User)
 
 private fun DownloadState.canOverrideUserPause(): Boolean =
     when (this) {

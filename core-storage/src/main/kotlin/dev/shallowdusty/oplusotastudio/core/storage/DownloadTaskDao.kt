@@ -17,6 +17,49 @@ interface DownloadTaskDao {
     @Query("SELECT * FROM download_tasks WHERE taskId = :taskId LIMIT 1")
     suspend fun get(taskId: String): DownloadTaskEntity?
 
+    @Query(
+        """
+        UPDATE download_tasks
+        SET
+            downloadedBytes = :downloadedBytes,
+            targetSize = :targetSize,
+            speedBytesPerSec = :speedBytesPerSec,
+            state = :state,
+            pauseReason = :pauseReason,
+            retryAttempt = :retryAttempt,
+            maxRetryAttempts = :maxRetryAttempts,
+            errorCategory = :errorCategory,
+            retriesRemaining = :retriesRemaining,
+            rawError = :rawError,
+            expectedHash = :expectedHash,
+            actualHash = :actualHash,
+            updatedAtMs = :updatedAtMs
+        WHERE taskId = :taskId
+            AND (
+                :canOverrideUserPause = 1
+                OR state != 'Paused'
+                OR pauseReason != 'User'
+            )
+        """,
+    )
+    suspend fun updateStateColumns(
+        taskId: String,
+        downloadedBytes: Long,
+        targetSize: Long?,
+        speedBytesPerSec: Long?,
+        state: String,
+        pauseReason: String?,
+        retryAttempt: Int?,
+        maxRetryAttempts: Int?,
+        errorCategory: String?,
+        retriesRemaining: Int?,
+        rawError: String?,
+        expectedHash: String?,
+        actualHash: String?,
+        updatedAtMs: Long,
+        canOverrideUserPause: Boolean,
+    ): Int
+
     @Query("DELETE FROM download_tasks WHERE taskId = :taskId")
     suspend fun delete(taskId: String)
 }
