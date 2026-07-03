@@ -23,7 +23,7 @@ class DownloadTempFileJanitor(
             .distinctBy { it.canonicalPath }
             .forEach { root ->
                 root.listFiles()
-                    ?.filter { it.isFile && it.name.endsWith(PART_SUFFIX) }
+                    ?.filter { file -> file.isFile && CleanupSuffixes.any { file.name.endsWith(it) } }
                     ?.forEach { partFile ->
                         val canonicalPath = partFile.canonicalPath
                         if (canonicalPath !in activeCanonicalPaths) {
@@ -43,6 +43,6 @@ class DownloadTempFileJanitor(
     }
 
     private companion object {
-        const val PART_SUFFIX = ".zip.part"
+        val CleanupSuffixes = listOf(".zip.part", ".zip.bad")
     }
 }

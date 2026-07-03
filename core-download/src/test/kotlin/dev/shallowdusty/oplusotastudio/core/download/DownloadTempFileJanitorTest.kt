@@ -25,7 +25,21 @@ class DownloadTempFileJanitorTest {
     }
 
     @Test
-    fun `ignores files that are not download part files`() {
+    fun `deletes quarantined bad ota files`() {
+        val tempRoot = testTempRoot("delete-quarantined")
+        val badFile = tempRoot.resolve("checksum-mismatch.zip.bad").also { it.writeText("bad") }
+
+        val result = DownloadTempFileJanitor(listOf(tempRoot)).deleteOrphanedParts(
+            activeTempFilePaths = emptySet(),
+        )
+
+        assertFalse(badFile.exists())
+        assertEquals(listOf(badFile.absolutePath), result.deletedPaths)
+        assertEquals(emptyList<String>(), result.failedPaths)
+    }
+
+    @Test
+    fun `ignores files that are not download cleanup candidates`() {
         val tempRoot = testTempRoot("ignore-other-files")
         val zip = tempRoot.resolve("package.zip").also { it.writeText("zip") }
         val text = tempRoot.resolve("note.txt").also { it.writeText("note") }
