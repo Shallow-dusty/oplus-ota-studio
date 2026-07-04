@@ -1,0 +1,166 @@
+OPlus OTA Studio OnePlus 9 Pro release smoke after current-build lookup fixes
+Date: 2026-07-02
+Local time: 2026-07-02 20:30 +08:00
+Branch: feat/backend-core
+Source commits:
+  0f42b37 fix(core-ota): treat empty artifact as no update
+  c7ad5ec fix(core-ota): run OTA HTTP calls on IO dispatcher
+
+Purpose
+-------
+
+Verify the temporary-signed R8 release APK on a physical OnePlus 9 Pro CN after
+fixing the release UI lookup path for the real current build.
+
+This is private-trial packaging and real-device UI smoke evidence. It is not a
+public release readiness claim.
+
+Root Cause Summary
+------------------
+
+The release UI initially showed:
+
+    查询失败
+    未知错误。
+
+Two separate causes were found and fixed:
+
+1. A true current-build ColorOS component request returns HTTP 200 with
+   `responseCode=2004` and `errMsg=artifactV1Result is empty`. This means no
+   update artifact is available for the current build and should map to
+   `NoUpdate`, not a server failure.
+2. The app called synchronous OkHttp `execute()` from a ViewModel coroutine on
+   the main dispatcher. Android treats that as main-thread networking, which was
+   caught as a runtime error and surfaced as Unknown. The transport now switches
+   the blocking HTTP call to `Dispatchers.IO`.
+
+Pre-Release Verification
+------------------------
+
+Commands:
+
+    .\gradlew.bat :core-ota:testDebugUnitTest
+
+    $env:LIVE_OTA='true'
+    $env:OTA_DEVICE_ID=<runtime Android ID, not recorded>
+    .\gradlew.bat :core-ota:testDebugUnitTest `
+      --tests dev.shallowdusty.oplusotastudio.core.ota.LiveColorOsOtaCurrentBuildTest
+
+Results:
+
+    BUILD SUCCESSFUL
+
+The guarded live current-build test verifies that the physical OnePlus 9 Pro CN
+current profile maps the live empty-artifact server response to `NoUpdate`.
+
+Release Build
+-------------
+
+Temporary throwaway keystore:
+
+    build/tmp/release-smoke-2026-07-02/oplus-ota-studio-smoke.jks
+
+Command:
+
+    .\gradlew.bat :app:assembleRelease
+
+Result:
+
+    BUILD SUCCESSFUL
+    :app:minifyReleaseWithR8 executed
+    :app:packageRelease completed
+    :app:assembleRelease completed
+
+Signed artifact:
+
+    app/build/outputs/apk/release/app-release.apk
+
+Artifact SHA-256:
+
+    C2F1D00A5EC7E0E59AF91FDD769BFB111334166E5C7E950EB7A5B6A285DA8E10
+
+Signature verification:
+
+    V2 Signer: certificate DN:
+      CN=OPlus OTA Studio Smoke, O=Shallow Dusty, C=US
+    V2 Signer certificate SHA-256 digest:
+      74d4880425058ab439fe65eff6d80968fee5408121e804db8f28112b37af49af
+
+Physical Device Install
+-----------------------
+
+Device:
+
+    OnePlus 9 Pro CN
+    model: LE2120
+    product: OnePlus9Pro_CH
+    device: OnePlus9Pro
+
+Install:
+
+    adb install -r app\build\outputs\apk\release\app-release.apk
+
+Result after rebuilding from `c7ad5ec`:
+
+    Performing Streamed Install
+    Success
+
+Installed package state:
+
+    codePath=/data/app/.../dev.shallowdusty.oplusotastudio-.../base.apk
+    versionCode=10 minSdk=26 targetSdk=36
+    versionName=0.1.0
+    firstInstallTime=2026-07-02 20:23:45
+    lastUpdateTime=2026-07-02 20:28:58
+
+Launch And Current-Build Query
+------------------------------
+
+Launch:
+
+    adb shell am force-stop dev.shallowdusty.oplusotastudio
+    adb logcat -c
+    adb shell monkey -p dev.shallowdusty.oplusotastudio 1
+
+Focused window:
+
+    dev.shallowdusty.oplusotastudio/.MainActivity
+
+Detected release UI profile:
+
+    model: LE2120
+    OTA version: LE2120_11.H.23_3230_202504181723
+    Android: 14
+    region: China
+
+Lookup action:
+
+    Tap 查询更新
+
+Result screen:
+
+    已是最新
+    此设备配置暂无可用更新。
+
+Targeted crash scan:
+
+    adb logcat -d -t 500 |
+      Select-String -Pattern
+        'AndroidRuntime|FATAL EXCEPTION|NetworkOnMainThread|oplusotastudio|OTA|lookup|Exception'
+
+Result:
+
+    No app-process FATAL EXCEPTION was observed.
+    No NetworkOnMainThreadException was observed after the IO dispatcher fix.
+
+Known Limits
+------------
+
+- This current-build query intentionally returns `NoUpdate`; the live endpoint
+  does not return the current full package for a profile that is already on that
+  build.
+- The current-version full ZIP itself was already downloaded and verified on
+  local disk in
+  `docs/evidence/download/current-full-package-oneplus9pro-cn-2026-07-02.txt`.
+- The successful package-found chain still uses the guarded replay profile from
+  `docs/evidence/ota/live-coloros-oneplus9pro-cn-2026-07-02.txt`.

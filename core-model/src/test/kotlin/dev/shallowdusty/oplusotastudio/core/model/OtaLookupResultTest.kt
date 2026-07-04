@@ -27,6 +27,22 @@ class OtaLookupResultTest {
     }
 
     @Test
+    fun `package evidence defaults to synthetic and requires experimental disclosure`() {
+        val pkg = samplePackage(versionName = "11.0.2.2")
+
+        assertEquals(OtaEvidenceLevel.Synthetic, pkg.evidenceLevel)
+        assertEquals(true, pkg.evidenceLevel.requiresExperimentalDisclosure)
+    }
+
+    @Test
+    fun `live verified package evidence does not require experimental disclosure`() {
+        val pkg = samplePackage(versionName = "11.0.2.2")
+            .copy(evidenceLevel = OtaEvidenceLevel.LiveVerified)
+
+        assertEquals(false, pkg.evidenceLevel.requiresExperimentalDisclosure)
+    }
+
+    @Test
     fun `Error carries category and raw for the details view`() {
         val err = OtaLookupResult.Error(OtaErrorCategory.Server, raw = "HTTP 503")
         assertEquals(OtaErrorCategory.Server, err.category)

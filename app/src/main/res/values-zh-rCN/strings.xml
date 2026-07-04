@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">OPlus OTA Studio</string>
+    <string name="nav_lookup">查询</string>
+    <string name="nav_downloads">下载</string>
+    <string name="download_notification_title">正在下载 OTA 包</string>
+    <string name="download_notification_channel">OTA 下载</string>
+</resources>

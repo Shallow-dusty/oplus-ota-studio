@@ -4,15 +4,23 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.shallowdusty.oplusotastudio.core.model.DeviceDetector
 import dev.shallowdusty.oplusotastudio.core.model.DeviceProfile
+import dev.shallowdusty.oplusotastudio.core.model.DownloadEngine
+import dev.shallowdusty.oplusotastudio.core.model.HistoryEntry
+import dev.shallowdusty.oplusotastudio.core.model.AlwaysAcceptedLookupPrivacyConsentStore
+import dev.shallowdusty.oplusotastudio.core.model.LookupPrivacyConsentStore
 import dev.shallowdusty.oplusotastudio.core.model.OtaErrorCategory
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupResult
 import dev.shallowdusty.oplusotastudio.core.model.OtaLookupService
 import dev.shallowdusty.oplusotastudio.core.model.OtaPackage
 import dev.shallowdusty.oplusotastudio.core.model.OtaProfile
 import dev.shallowdusty.oplusotastudio.core.model.OtaRegion
+import dev.shallowdusty.oplusotastudio.core.model.PackageRepository
+import dev.shallowdusty.oplusotastudio.core.model.isLookupReady
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -31,7 +39,13 @@ sealed interface LookupUiState {
     data object Querying : LookupUiState
 
     /** A package was found. */
-    data class PackageFound(val pkg: OtaPackage) : LookupUiState
+    data class PackageFound(
+        val pkg: OtaPackage,
+        val liveLookupExperimental: Boolean = pkg.evidenceLevel.requiresExperimentalDisclosure,
+    ) : LookupUiState
+
+    /** First lookup requires explicit consent before sending build info. */
+    data class PrivacyDisclosureRequired(val profile: OtaProfile, val device: DeviceProfile?) : LookupUiState
 
     /** Server reports the device is current. */
     data object NoUpdate : LookupUiState
@@ -48,6 +62,11 @@ sealed interface LookupUiState {
 class LookupViewModel(
     private val deviceDetector: DeviceDetector,
     private val lookupService: OtaLookupService,
+    private val downloadEngine: DownloadEngine? = null,
+    private val packageRepository: PackageRepository? = null,
+    private val privacyConsentStore: LookupPrivacyConsentStore = AlwaysAcceptedLookupPrivacyConsentStore,
+    private val nowMs: () -> Long = { System.currentTimeMillis() },
+    private val historyIdGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LookupUiState>(LookupUiState.Detecting)
@@ -83,14 +102,21 @@ class LookupViewModel(
     fun lookup() {
         val ready = _uiState.value as? LookupUiState.Ready ?: return
         val profile = ready.profile
-        if (profile.otaVersion.isBlank()) return // spec §2.3: block incomplete profiles
+        if (!profile.isLookupReady) return // spec §2.3: block incomplete profiles
         viewModelScope.launch {
-            _uiState.value = LookupUiState.Querying
-            _uiState.value = when (val result = lookupService.lookup(profile)) {
-                is OtaLookupResult.PackageFound -> LookupUiState.PackageFound(result.pkg)
-                OtaLookupResult.NoUpdate -> LookupUiState.NoUpdate
-                is OtaLookupResult.Error -> LookupUiState.Error(result.category, result.raw)
+            if (!privacyConsentStore.accepted.first()) {
+                _uiState.value = LookupUiState.PrivacyDisclosureRequired(profile, ready.device)
+                return@launch
             }
+            runLookup(profile)
+        }
+    }
+
+    fun acceptPrivacyDisclosureAndLookup() {
+        val pending = _uiState.value as? LookupUiState.PrivacyDisclosureRequired ?: return
+        viewModelScope.launch {
+            privacyConsentStore.accept()
+            runLookup(pending.profile)
         }
     }
 
@@ -106,6 +132,46 @@ class LookupViewModel(
     fun reset() {
         lastReady?.let { _uiState.value = it }
     }
+
+    fun enqueueDownload(pkg: OtaPackage) {
+        val engine = downloadEngine ?: return
+        viewModelScope.launch {
+            engine.enqueue(pkg)
+        }
+    }
+
+    private suspend fun recordLookup(profile: OtaProfile, pkg: OtaPackage) {
+        packageRepository?.record(
+            HistoryEntry(
+                id = historyIdGenerator(),
+                profileModel = profile.model,
+                profileRegion = profile.region,
+                packageName = pkg.versionName,
+                packageSize = pkg.sizeBytes,
+                sourceHost = pkg.sourceHost,
+                downloadUrl = pkg.downloadUrl,
+                md5 = pkg.md5,
+                sha256 = pkg.sha256,
+                releaseNotes = pkg.releaseNotes,
+                evidenceLevel = pkg.evidenceLevel,
+                lookedUpAtMs = nowMs(),
+                downloadedAtMs = null,
+                localFilePath = null,
+            ),
+        )
+    }
+
+    private suspend fun runLookup(profile: OtaProfile) {
+        _uiState.value = LookupUiState.Querying
+        _uiState.value = when (val result = lookupService.lookup(profile)) {
+            is OtaLookupResult.PackageFound -> {
+                recordLookup(profile, result.pkg)
+                LookupUiState.PackageFound(result.pkg)
+            }
+            OtaLookupResult.NoUpdate -> LookupUiState.NoUpdate
+            is OtaLookupResult.Error -> LookupUiState.Error(result.category, result.raw)
+        }
+    }
 }
 
 /** Build an [OtaProfile] from detected facts; null if the build string is missing. */
@@ -118,5 +184,8 @@ private fun DeviceProfile.toProfile(): OtaProfile? {
         otaVersion = version,
         systemType = null,
         deviceCodename = product,
+        nvCarrier = nvCarrier,
+        deviceId = deviceId,
+        language = language,
     )
 }

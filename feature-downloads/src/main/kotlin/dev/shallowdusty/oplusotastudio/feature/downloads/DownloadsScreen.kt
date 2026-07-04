@@ -1,5 +1,6 @@
 package dev.shallowdusty.oplusotastudio.feature.downloads
 
+import android.content.ClipData
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,10 +10,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -22,9 +28,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +42,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.shallowdusty.oplusotastudio.core.model.DownloadState
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.launch
 
 /**
  * The downloads screen (spec §5 step 5-6, §6). Renders the engine's task queue;
@@ -44,16 +54,17 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 @Composable
 fun DownloadsScreen(
     factory: () -> DownloadsViewModel,
+    beforeDownload: ((() -> Unit) -> Unit) = { action -> action() },
 ) {
     val viewModel: DownloadsViewModel = viewModel(factory = viewModelFactory { initializer { factory() } })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Downloads") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.downloads_title)) }) },
     ) { padding ->
-        if (state.rows.isEmpty()) {
+        if (state.rows.isEmpty() && state.historyRows.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("No downloads yet.", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.downloads_empty), style = MaterialTheme.typography.bodyMedium)
             }
         } else {
             LazyColumn(
@@ -61,8 +72,33 @@ fun DownloadsScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(state.rows, key = { it.taskId }) { row ->
-                    DownloadRowCard(row)
+                if (state.rows.isNotEmpty()) {
+                    item {
+                        SectionTitle(stringResource(R.string.downloads_active_section))
+                    }
+                    items(state.rows, key = { it.taskId }) { row ->
+                        DownloadRowCard(
+                            row = row,
+                            onPause = viewModel::pause,
+                            onResume = viewModel::resume,
+                            onCancel = viewModel::cancel,
+                        )
+                    }
+                }
+                if (state.historyRows.isNotEmpty()) {
+                    item {
+                        SectionTitle(stringResource(R.string.downloads_history_section))
+                    }
+                    items(state.historyRows, key = { it.id }) { row ->
+                        HistoryRowCard(
+                            row = row,
+                            onDownload = { id ->
+                                beforeDownload {
+                                    viewModel.enqueueHistoryPackage(id)
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -70,7 +106,18 @@ fun DownloadsScreen(
 }
 
 @Composable
-private fun DownloadRowCard(row: DownloadRow) {
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+}
+
+@Composable
+private fun DownloadRowCard(
+    row: DownloadRow,
+    onPause: (String) -> Unit,
+    onResume: (String) -> Unit,
+    onCancel: (String) -> Unit,
+) {
+    val presentation = row.state.toPresentation()
     Column(Modifier.fillMaxWidth()) {
         Text(
             text = row.taskId.takeLast(8),
@@ -79,16 +126,105 @@ private fun DownloadRowCard(row: DownloadRow) {
         )
         Spacer(Modifier.height(4.dp))
         when (val s = row.state) {
-            DownloadState.Queued -> StateLabel("Queued")
-            is DownloadState.Running -> RunningContent(s)
-            is DownloadState.Paused -> PausedContent(s)
+            DownloadState.Queued -> QueuedContent(
+                taskId = row.taskId,
+                onCancel = onCancel,
+            )
+            is DownloadState.Running -> RunningContent(
+                state = s,
+                taskId = row.taskId,
+                onPause = onPause,
+                onCancel = onCancel,
+            )
+            is DownloadState.Paused -> PausedContent(
+                state = s,
+                taskId = row.taskId,
+                onResume = onResume,
+                onCancel = onCancel,
+            )
             is DownloadState.Retrying -> RetryingContent(s)
             DownloadState.Verifying -> VerifyingContent()
-            DownloadState.Verified -> StateLabel("Verified", color = MaterialTheme.colorScheme.primary)
-            DownloadState.Canceled -> StateLabel("Canceled", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            DownloadState.Verified -> VerifiedContent()
+            DownloadState.Unverified -> UnverifiedContent()
+            DownloadState.Canceled -> StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             is DownloadState.Failed -> FailedContent(s)
         }
     }
+}
+
+@Composable
+private fun HistoryRowCard(
+    row: HistoryRow,
+    onDownload: (String) -> Unit,
+) {
+    val clipboard = LocalClipboard.current
+    val coroutineScope = rememberCoroutineScope()
+    Column(Modifier.fillMaxWidth()) {
+        Text(row.packageName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.downloads_history_meta, formatBytes(row.packageSize), row.sourceHost, row.evidenceLabel),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        row.localFilePath?.let { path ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                path,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = { onDownload(row.id) }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.CloudDownload, contentDescription = null)
+            Spacer(Modifier.size(8.dp))
+            Text(stringResource(R.string.downloads_download))
+        }
+        Spacer(Modifier.height(8.dp))
+        val clipboardPackageLinkLabel = stringResource(R.string.downloads_clipboard_package_link)
+        val clipboardDownloadedPathLabel = stringResource(R.string.downloads_clipboard_downloaded_path)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = {
+                    coroutineScope.launch {
+                        clipboard.setClipEntry(
+                            ClipEntry(ClipData.newPlainText(clipboardPackageLinkLabel, row.downloadUrl)),
+                        )
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(R.string.downloads_copy_link))
+            }
+            row.localFilePath?.let { path ->
+                OutlinedButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            clipboard.setClipEntry(
+                                ClipEntry(ClipData.newPlainText(clipboardDownloadedPathLabel, path)),
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.downloads_copy_path))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VerifiedContent() {
+    val presentation = DownloadState.Verified.toPresentation()
+    StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.primary)
+    DetailTexts(presentation)
 }
 
 @Composable
@@ -97,59 +233,119 @@ private fun StateLabel(text: String, color: androidx.compose.ui.graphics.Color =
 }
 
 @Composable
-private fun RunningContent(state: DownloadState.Running) {
-    val target = state.targetSize
-    val progress = if (target != null && target > 0) {
-        (state.downloadedBytes.toFloat() / target).coerceIn(0f, 1f)
-    } else null
-    if (progress != null) {
-        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+private fun QueuedContent(
+    taskId: String,
+    onCancel: (String) -> Unit,
+) {
+    val presentation = DownloadState.Queued.toPresentation()
+    StateLabel(presentation.label.asString())
+    TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.downloads_cancel))
+    }
+}
+
+@Composable
+private fun RunningContent(
+    state: DownloadState.Running,
+    taskId: String,
+    onPause: (String) -> Unit,
+    onCancel: (String) -> Unit,
+) {
+    val presentation = state.toPresentation()
+    if (presentation.progressFraction != null) {
+        LinearProgressIndicator(progress = { presentation.progressFraction }, modifier = Modifier.fillMaxWidth())
     } else {
         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
     }
     Spacer(Modifier.height(4.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("${formatBytes(state.downloadedBytes)} / ${target?.let(::formatBytes) ?: "?"}", style = MaterialTheme.typography.bodySmall)
-        Text(state.speedBytesPerSec?.let { "${formatBytes(it)}/s" } ?: "—", style = MaterialTheme.typography.bodySmall)
+        Text(
+            presentation.label.asString(),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(
+            presentation.speedBytesPerSec?.let { stringResource(R.string.downloads_speed, formatBytes(it)) } ?: "—",
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { /* pause: wired via ViewModel in app */ }, modifier = Modifier.weight(1f)) { Text("Pause") }
-        TextButton(onClick = { /* cancel */ }, modifier = Modifier.weight(1f)) { Text("Cancel") }
+        OutlinedButton(onClick = { onPause(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_pause)) }
+        TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_cancel)) }
     }
 }
 
 @Composable
-private fun PausedContent(state: DownloadState.Paused) {
-    StateLabel("Paused (${state.reason.name.lowercase()})", color = MaterialTheme.colorScheme.tertiary)
+private fun PausedContent(
+    state: DownloadState.Paused,
+    taskId: String,
+    onResume: (String) -> Unit,
+    onCancel: (String) -> Unit,
+) {
+    val presentation = state.toPresentation()
+    StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.tertiary)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { /* resume */ }, modifier = Modifier.weight(1f)) { Text("Resume") }
-        TextButton(onClick = { /* cancel */ }, modifier = Modifier.weight(1f)) { Text("Cancel") }
+        OutlinedButton(onClick = { onResume(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_resume)) }
+        TextButton(onClick = { onCancel(taskId) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.downloads_cancel)) }
     }
 }
 
 @Composable
 private fun RetryingContent(state: DownloadState.Retrying) {
-    StateLabel("Retrying (${state.attempt}/${state.maxAttempts}) — ${state.category.name.lowercase()}", color = MaterialTheme.colorScheme.tertiary)
+    val presentation = state.toPresentation()
+    StateLabel(
+        presentation.label.asString(),
+        color = MaterialTheme.colorScheme.tertiary,
+    )
     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
 private fun VerifyingContent() {
+    val presentation = DownloadState.Verifying.toPresentation()
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         CircularProgressIndicator(modifier = Modifier.height(16.dp))
-        Text("Verifying checksum…", style = MaterialTheme.typography.bodyMedium)
+        Text(presentation.label.asString(), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
+private fun UnverifiedContent() {
+    val presentation = DownloadState.Unverified.toPresentation()
+    StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.tertiary)
+    DetailTexts(presentation)
+}
+
+@Composable
 private fun FailedContent(state: DownloadState.Failed) {
-    StateLabel("Failed — ${state.category.name.lowercase()}", color = MaterialTheme.colorScheme.error)
-    if (state.retriesRemaining > 0) {
-        Text("${state.retriesRemaining} retries remaining", style = MaterialTheme.typography.bodySmall)
-    }
-    state.raw?.let {
+    val presentation = state.toPresentation()
+    StateLabel(presentation.label.asString(), color = MaterialTheme.colorScheme.error)
+    DetailTexts(presentation)
+    presentation.rawDetails?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+@Composable
+private fun DetailTexts(presentation: DownloadStatePresentation) {
+    presentation.details.forEach { detail ->
+        Text(
+            detail.asString(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun DownloadStateText.asString(): String {
+    val formattedArgs = args.map { arg ->
+        when (arg) {
+            is Long -> formatBytes(arg)
+            null -> "?"
+            else -> arg
+        }
+    }.toTypedArray()
+    return stringResource(resId, *formattedArgs)
 }
 
 private fun formatBytes(bytes: Long): String {

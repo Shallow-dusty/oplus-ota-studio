@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">OPlus OTA Studio</string>
+    <string name="nav_lookup">Lookup</string>
+    <string name="nav_downloads">Downloads</string>
+    <string name="download_notification_title">Downloading OTA package</string>
+    <string name="download_notification_channel">OTA downloads</string>
+</resources>

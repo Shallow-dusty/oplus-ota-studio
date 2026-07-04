@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="3" failures="0" errors="0" skipped="1" time="3.113" timestamp="2026-07-01T08:49:38" hostname="localhost">
+  <testsuite name="dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoterInstrumentedTest" tests="2" failures="0" errors="0" skipped="1" time="0.393" timestamp="2026-07-01T08:49:38" hostname="localhost">
+    <properties>
+      <property name="device" value="OPlus_API34(AVD) - 14" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="promotesZipIntoDownloadsCollectionOnScopedStorage" classname="dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoterInstrumentedTest" time="0.366" />
+    <testcase name="promotesZipIntoPublicDownloadsOnLegacyStorage" classname="dev.shallowdusty.oplusotastudio.download.AndroidMediaStoreDownloadFilePromoterInstrumentedTest" time="0.027">
+      <skipped />
+    </testcase>
+  </testsuite>
+  <testsuite name="dev.shallowdusty.oplusotastudio.download.AndroidOtaLookupDownloadSmokeInstrumentedTest" tests="1" failures="0" errors="0" skipped="0" time="0.596" timestamp="2026-07-01T08:49:38" hostname="localhost">
+    <properties>
+      <property name="device" value="OPlus_API34(AVD) - 14" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="parsesControlledOtaFixtureAndPromotesDownloadedZip" classname="dev.shallowdusty.oplusotastudio.download.AndroidOtaLookupDownloadSmokeInstrumentedTest" time="0.596" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,93 @@
+OPlus OTA Studio UI state render instrumentation evidence
+Date: 2026-07-01
+Local time: 2026-07-01 23:20 +08:00
+Branch: feat/backend-core
+Source commit before this evidence doc: 7d7d054
+
+Purpose
+-------
+Add device-backed Compose UI render coverage after the lookup/download
+presentation mapper tests. This verifies that selected lookup and download
+states render through the real composables, not only through pure JVM
+presentation mappers.
+
+Dependency and test commits
+---------------------------
+- 1c7bd66 build: add compose UI test dependencies
+- 7d7d054 test: render lookup and download UI states
+
+RED evidence
+------------
+Command:
+  .\gradlew.bat :app:compileDebugAndroidTestKotlin
+
+Initial result:
+  BUILD FAILED
+
+Expected failure:
+  The new test referenced androidx.compose.ui.test APIs before the app module
+  declared Compose UI test dependencies.
+
+GREEN evidence
+--------------
+Command:
+  .\gradlew.bat :app:compileDebugAndroidTestKotlin
+
+Result:
+  BUILD SUCCESSFUL
+
+Device run
+----------
+AVD:
+  OPlus_API34
+
+Before the successful run, the first connected test attempt failed because the
+emulator still had a temporary signed release APK installed:
+
+  INSTALL_FAILED_UPDATE_INCOMPATIBLE
+
+After uninstall cleanup, the targeted UI render test passed.
+
+Command:
+  .\gradlew.bat :app:connectedDebugAndroidTest `
+    "-Pandroid.testInstrumentationRunnerArguments.class=dev.shallowdusty.oplusotastudio.ui.UiStateRenderInstrumentedTest"
+
+Result:
+  BUILD SUCCESSFUL
+  Starting 3 tests on OPlus_API34(AVD) - 14
+  Tests 3/3 completed
+  0 skipped
+  0 failed
+
+JUnit XML:
+  app/build/outputs/androidTest-results/connected/debug/TEST-OPlus_API34(AVD) - 14-_app-.xml
+
+XML summary:
+  tests="3"
+  failures="0"
+  errors="0"
+  skipped="0"
+
+Covered render cases
+--------------------
+- Lookup package found renders "Update available", experimental live lookup
+  disclosure, transfer-integrity-only copy, and captures a nonblank root image.
+- Lookup server error renders "Lookup failed", category copy, raw detail, and
+  captures a nonblank root image.
+- Downloads screen renders queued, running, paused, retrying, verifying,
+  verified, unverified, canceled, failed checksum mismatch labels, and captures
+  a nonblank root image.
+
+Gate
+----
+Command:
+  .\gradlew.bat test lintDebug :app:compileDebugAndroidTestKotlin
+
+Result:
+  BUILD SUCCESSFUL
+
+Known limits
+------------
+- This is not golden image comparison.
+- This does not replace final public screenshot review.
+- This does not prove real-device OPlus/OnePlus live OTA lookup behavior.

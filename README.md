@@ -5,9 +5,12 @@ profile setup, package lookup, resumable download, integrity verification, and
 clear status feedback — running entirely on the phone, no root required for the
 normal lookup/download flow.
 
-> **Status:** v0.0 — revertable foundation (scaffold + domain contracts + UI
-> shell with fake bindings). Real protocol/download/storage implementations are
-> landing incrementally; see the design spec for the milestone roadmap.
+> **Status:** public-source v0.1 trial. The app now has real lookup, download,
+> storage, WorkManager, logging, diagnostics, MediaStore promotion wiring,
+> release signing configuration, and physical OnePlus 9 Pro CN live ColorOS
+> evidence. The source is ready to review in public; the APK is still a
+> trial/self-build artifact, not a broad public release.
+> See [`docs/progress.md`](docs/progress.md) for the current progress panel.
 
 ## Project layout
 
@@ -26,9 +29,10 @@ strictly one-way (lower layers never depend on higher layers):
 
 `core-model` defines the service contracts (`OtaLookupService`,
 `DownloadEngine`, `DeviceDetector`, `PackageRepository`); feature modules depend
-only on those interfaces, and `app` injects the implementation. During v0.0 the
-app injects **fake** implementations so the UI compiles and runs before the
-backend modules exist.
+only on those interfaces, and `app` injects the implementation. Normal app
+startup now uses real Room/DataStore, WorkManager, MediaStore promotion,
+logging, diagnostics, device detection, and ColorOS component OTA lookup wiring.
+`AppGraph` still keeps fake defaults for tests and non-Application construction.
 
 ## Design spec
 
@@ -36,6 +40,8 @@ The authoritative design and delivery plan lives at
 [`docs/superpowers/specs/2026-06-29-oplus-ota-studio-design.md`](docs/superpowers/specs/2026-06-29-oplus-ota-studio-design.md).
 Every architectural decision (protocol contract, device detection, download
 state machine, storage, error taxonomy, milestones) is documented there.
+Current implementation progress is tracked in
+[`docs/progress.md`](docs/progress.md).
 
 ## Build
 
@@ -47,6 +53,22 @@ The Gradle wrapper is pinned to Gradle 9.6.1.
 ./gradlew test               # pure-JVM unit tests
 ./gradlew lintDebug          # Android Lint (CI runs these three)
 ```
+
+Private-trial release signing is documented in
+[`docs/release.md`](docs/release.md). Signing keys and passwords must stay out
+of the repository.
+
+## Public repository notes
+
+- This project is independent and is not affiliated with, endorsed by, or
+  supported by OPlus or OnePlus.
+- Hash checks verify download transfer integrity only. The app does not verify
+  OPlus OTA package signatures.
+- Real-device live evidence is currently strongest for OnePlus 9 Pro CN
+  (`LE2120` / `OnePlus9Pro_CH`). Other models and regions need their own live
+  validation before making broad compatibility claims.
+- OTA evidence files redact raw Android IDs, serials, IMEIs, and long-lived or
+  signed package URLs. The repository records package metadata, not OTA ZIPs.
 
 > **detekt deferred.** No stable detekt release supports Kotlin 2.4.0 yet
 > (1.23.8 tops out at Kotlin 2.0.21; 2.0.0-alpha.5 supports 2.4.0 but is a

@@ -93,13 +93,20 @@ OPlus services have shipped both a legacy XML/form style (OnePlus lineage) and a
 
 **Style B — OPlus JSON (ColorOS):**
 
-- Method: `POST`
-- Path: ❓ confirm
-- Headers: `Content-Type: application/json`
-- Body fields (❓ confirm names):
-  - `model`, `region`, `romVersion`, `otaVersion`, `androidVersion`
-- Response: JSON
-  - `data.url`, `data.size`, `data.md5`, `data.versionName` (❓ shape)
+- Method: `POST` ✅
+- Verified CN endpoint: `https://component-otapc-cn.allawntech.com/update/v3` ✅
+- Headers: `Content-Type: application/json`, `version: 2`,
+  `protectedKey`, plus model/build/region/language/device hint headers ✅
+- Body shape: JSON root with encrypted `params`; decrypted payload includes
+  `model`, `productName`, `romVersion`, `otaVersion`, `androidVersion`,
+  `colorOSVersion`, `uRegion`, `trackRegion`, `deviceId`, and `otaPrefix` ✅
+  for the OnePlus 9 Pro CN replay profile. `nvCarrier` is sent as a request
+  header in the verified chain.
+- Response shape: JSON root with `responseCode` and encrypted `body`;
+  decrypted body contains `components[0].componentPackets.url`,
+  `components[0].componentPackets.size`,
+  `components[0].componentPackets.md5`, and root `versionName` ✅ for the
+  OnePlus 9 Pro CN replay profile.
 
 ### 1.3 Response Model
 
@@ -330,7 +337,7 @@ Use TDD for behavior-heavy code. The default verification ladder is pure JVM fir
 - Unit tests for OTA response parsing with successful, no-update, malformed, and missing-field fixtures (redacted captures from §1.5).
 - Unit tests for download state transitions (full state machine in §3.5), resume header calculation, etag-change discard, file promotion rules, and checksum mismatch.
 - Integration tests with a fake `MockWebServer` covering: full download + verify, resume after disconnect, server-side package change, and checksum mismatch.
-- Instrumentation tests for storage promotion to `MediaStore.Downloads` across API 26/29/34. CI runs API 29/34 first; API 26 may be local-only until emulator stability is proven, but its command and result must be recorded before v0.1 is called done.
+- Instrumentation tests for storage promotion to `MediaStore.Downloads` across API 26/29/34. CI compiles instrumentation tests as a stable PR gate; connected execution may remain local/manual until hosted emulator stability is proven, but commands and results must be recorded before v0.1 is called done.
 - UI tests for lookup state rendering and primary download interactions after the core flows exist; add Compose screenshot tests for each state in §6.
 
 The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver`) and local temp files over mocks where possible.
@@ -348,7 +355,7 @@ The first implementation should prefer fake HTTP servers (`okhttp3.mockwebserver
 - **Fallback baseline if AGP 9.2 or Kotlin 2.4 blocks Compose/Room/KSP stability:** Kotlin `2.2.21`, AGP `8.13.x`, JDK `17`, targetSdk `35`. If the fallback is used, open a `docs:` follow-up to record why and when to retry the modern baseline.
 - Build variants: `debug` (verbose logs, no R8), `release` (R8 full mode, obfuscation on, signed via a keystore stored outside the repo).
 - Android Lint runs in CI; new code must be clean. **detekt deferred:** no stable detekt release supports Kotlin 2.4.0 as of 2026-06 (1.23.8 tops out at Kotlin 2.0.21; 2.0.0-alpha.5 supports 2.4.0 but is excluded by the no-snapshot/alpha rule below). detekt is re-enabled as a follow-up once a stable release supporting Kotlin 2.4.0 ships; until then Android Lint is the sole static check.
-- **CI:** GitHub Actions matrix (unit tests on JVM, instrumentation on API 29/34 emulators via `reactivecircus/android-emulator-runner`). Block merges on red unit tests; instrumentation is informational until stable.
+- **CI:** GitHub Actions runs JVM tests, Android Lint, and instrumentation test compilation. Connected emulator/device execution is evidence-bearing but may stay local/manual until hosted emulator stability is proven.
 - **Branch & commit:** trunk `main` protected; feature branches `feat/`, `fix/`, `docs/`; squash-merge PRs; conventional-commit messages (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
 - **Dependencies:** version catalog (`libs.versions.toml`); no snapshot dependencies in `main`.
 
@@ -388,7 +395,7 @@ Done when:
 - [ ] `en` + `zh-rCN` strings complete; no hardcoded user-facing text.
 - [ ] Error categories in §8 all have user-facing copy and a details view.
 - [ ] Local logging + export (§9) wired to the details view.
-- [ ] R8 release build installs and runs; CI green on emulator matrix.
+- [ ] R8 release build installs and runs; CI green on unit/lint/instrumentation compilation, with connected emulator or device evidence recorded separately.
 - [ ] Public release readiness review passes: naming/trademark, privacy disclosure, fixture redistribution, screenshots, and branch protection.
 
 ### Future
@@ -403,7 +410,11 @@ The PC companion should be treated as a second product surface, not a dependency
 
 ## Repository Setup
 
-The local project already lives at `E:\coding\oplus-ota-studio`, with GitHub remote `Shallow-dusty/oplus-ota-studio`. Keep the repository private until the app has a working first release candidate (v0.3).
+The local project already lives at `E:\coding\oplus-ota-studio`, with GitHub
+remote `Shallow-dusty/oplus-ota-studio`. The original private-until-v0.3 gate
+was superseded on 2026-07-02 after physical OnePlus 9 Pro CN release smoke and
+redacted evidence cleanup: the source repository may be public while APK
+distribution remains trial/self-build only.
 
 Before regular feature work begins, finish the v0.0 bootstrap checklist:
 

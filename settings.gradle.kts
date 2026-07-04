@@ -26,5 +26,8 @@ rootProject.name = "oplus-ota-studio"
 // will be included by codex once they land.
 include(":app")
 include(":core-model")
+include(":core-download")
+include(":core-ota")
+include(":core-storage")
 include(":feature-lookup")
 include(":feature-downloads")

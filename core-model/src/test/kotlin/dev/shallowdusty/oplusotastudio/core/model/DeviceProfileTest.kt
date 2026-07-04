@@ -27,6 +27,9 @@ class DeviceProfileTest {
         assertNull(profile.otaVersion)
         assertNull(profile.marketingName)
         assertNull(profile.region)
+        assertNull(profile.nvCarrier)
+        assertNull(profile.deviceId)
+        assertNull(profile.language)
         // buildDisplay is the reliable fallback for parsing the build string.
         assertEquals("OnePlus9Pro_Oxygen_OS.LE28AA_11.0.2.2", profile.buildDisplay)
     }
@@ -44,9 +47,15 @@ class DeviceProfileTest {
             region = OtaRegion.Global,
             serialSuffix = "1234",
             incomplete = false,
+            nvCarrier = "10010111",
+            deviceId = "android-id",
+            language = "en-US",
         )
         assertEquals("11.0.2.2.LE28AA", profile.otaVersion)
         assertEquals(OtaRegion.Global, profile.region)
         assertEquals("1234", profile.serialSuffix)
+        assertEquals("10010111", profile.nvCarrier)
+        assertEquals("android-id", profile.deviceId)
+        assertEquals("en-US", profile.language)
     }
 }

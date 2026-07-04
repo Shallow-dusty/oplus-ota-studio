@@ -1,0 +1,136 @@
+OPlus OTA Studio live ColorOS OTA evidence
+Date: 2026-07-02
+Branch: feat/backend-core
+
+Purpose
+-------
+
+Record the first successful phone-side ColorOS component OTA lookup path after
+the earlier PC-side legacy endpoint replay failed. This evidence proves the
+OnePlus 9 Pro CN replay profile can query the live ColorOS component endpoint
+from a physical device and return the expected package metadata.
+
+Device
+------
+
+Physical device:
+
+    adb devices -l
+    <redacted-serial> device product:OnePlus9Pro_CH model:LE2120 device:OnePlus9Pro
+
+Collected non-sensitive profile facts:
+
+    ro.product.model: LE2120
+    ro.product.name: OnePlus9Pro_CH
+    ro.product.device: OnePlus9Pro
+    ro.build.version.ota: LE2120_11.H.23_3230_202504181723
+    ro.build.display.id: LE2120_14.0.0.1901(CN01)
+    ro.build.oplus_nv_id: 10010111
+    persist.sys.locale: zh-Hans-CN
+    persist.sys.oplus.region: CN
+
+The instrumentation test reads Android ID at runtime through
+Settings.Secure.ANDROID_ID. The raw Android ID is intentionally not recorded in
+this evidence file or committed test data.
+
+Lookup Path
+-----------
+
+Enabled app lookup service:
+
+    ColorOsOtaLookupService
+
+Endpoint:
+
+    https://component-otapc-cn.allawntech.com/update/v3
+
+Replay profile used by the guarded live instrumentation test:
+
+    model: LE2120
+    deviceCodename: OnePlus9Pro_CH
+    region: CN
+    otaVersion: LE2120_11.H.23_0001_000000000001
+    nvCarrier: 10010111
+    language: zh-Hans-CN
+
+Important limitation:
+
+    This is a live phone-side endpoint query using a replay/spoofed OTA build
+    string from the known successful OnePlus 9 Pro CN chain. It is not a pure
+    "current installed build asks whether it has an update" result. The app
+    should continue to label this package evidence as replayed-real-profile,
+    not live-verified.
+
+Commands And Results
+--------------------
+
+JVM and build verification:
+
+    .\gradlew.bat :core-model:testDebugUnitTest :core-ota:testDebugUnitTest :feature-lookup:testDebugUnitTest :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+
+Result:
+
+    BUILD SUCCESSFUL
+
+Install target app:
+
+    adb install -r -t app\build\outputs\apk\debug\app-debug.apk
+
+Result:
+
+    Performing Streamed Install
+    Success
+
+Install instrumentation APK:
+
+    adb install -r -t app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+
+Result:
+
+    Performing Streamed Install
+    Success
+
+Run live OTA instrumentation, without passing a raw device ID:
+
+    adb shell am instrument -w -r -e class dev.shallowdusty.oplusotastudio.ota.LiveColorOsOtaLookupInstrumentedTest -e liveOta true -e model LE2120 -e deviceCodename OnePlus9Pro_CH -e otaVersion LE2120_11.H.23_0001_000000000001 -e nvCarrier 10010111 -e language zh-Hans-CN dev.shallowdusty.oplusotastudio.test/androidx.test.runner.AndroidJUnitRunner
+
+Result:
+
+    Time: 0.788
+
+    OK (1 test)
+
+The test asserts:
+
+    versionName: LE2120_14.0.0.1901(CN01)
+    sizeBytes: 6559817109
+    md5: 5ae1e4d8101218d58c1da10092b22996
+    sourceHost: component-otapc-cn.allawntech.com
+    evidenceLevel: replayed-real-profile
+
+Launch Smoke
+------------
+
+After reinstalling the current debug APK:
+
+    adb shell monkey -p dev.shallowdusty.oplusotastudio 1
+
+Focused window:
+
+    mCurrentFocus=Window{... dev.shallowdusty.oplusotastudio/dev.shallowdusty.oplusotastudio.MainActivity}
+    mFocusedApp=ActivityRecord{... dev.shallowdusty.oplusotastudio/.MainActivity ...}
+
+Targeted logcat scan:
+
+    No app-process AndroidRuntime / FATAL EXCEPTION was observed in the recent
+    launch window.
+
+Conclusion
+----------
+
+The earlier blocker was not app installation. The production gap was that the
+app still used the stale legacy OTA endpoint and did not pass ColorOS request
+hints needed by the live component endpoint. The app now installs on the
+physical OnePlus 9 Pro, launches, and its guarded instrumentation path can
+query the live ColorOS component OTA endpoint successfully.
+
