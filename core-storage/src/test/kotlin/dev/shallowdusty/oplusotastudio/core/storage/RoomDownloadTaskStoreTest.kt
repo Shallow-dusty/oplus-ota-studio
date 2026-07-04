@@ -126,6 +126,67 @@ class RoomDownloadTaskStoreTest {
     }
 
     @Test
+    fun `updateState does not overwrite terminal completed task`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ).withState(
+                state = DownloadState.Verified,
+                updatedAtMs = 150L,
+            ),
+        )
+
+        store.updateState(
+            taskId = "task-1",
+            state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),
+            updatedAtMs = 200L,
+        )
+
+        assertEquals(DownloadState.Verified, store.getTask("task-1")?.state)
+    }
+
+    @Test
+    fun `updateState does not overwrite exhausted terminal failure`() = runTest {
+        val dao = FakeDownloadTaskDao()
+        val store = RoomDownloadTaskStore(dao)
+        dao.rows.value = listOf(
+            DownloadTaskEntity.fromPackage(
+                taskId = "task-1",
+                pkg = samplePackage(),
+                tempFilePath = "/cache/task-1.zip.part",
+                updatedAtMs = 100L,
+            ).withState(
+                state = DownloadState.Failed(
+                    category = OtaErrorCategory.File,
+                    retriesRemaining = 0,
+                    raw = "disk full",
+                ),
+                updatedAtMs = 150L,
+            ),
+        )
+
+        store.updateState(
+            taskId = "task-1",
+            state = DownloadState.Queued,
+            updatedAtMs = 200L,
+        )
+
+        assertEquals(
+            DownloadState.Failed(
+                category = OtaErrorCategory.File,
+                retriesRemaining = 0,
+                raw = "disk full",
+            ),
+            store.getTask("task-1")?.state,
+        )
+    }
+
+    @Test
     fun `updateState does not overwrite user pause written during worker state race`() = runTest {
         val dao = FakeDownloadTaskDao()
         val store = RoomDownloadTaskStore(dao)
@@ -516,6 +577,12 @@ class RoomDownloadTaskStoreTest {
             runBeforeWrite()
             val current = rows.value.firstOrNull { it.taskId == taskId } ?: return 0
             if (!canOverrideUserPause && current.state == "Paused" && current.pauseReason == "User") {
+                return 0
+            }
+            if (current.state in listOf("Verified", "Unverified", "Canceled")) {
+                return 0
+            }
+            if (current.state == "Failed" && (current.retriesRemaining ?: 0) <= 0) {
                 return 0
             }
             val updated = current.copy(

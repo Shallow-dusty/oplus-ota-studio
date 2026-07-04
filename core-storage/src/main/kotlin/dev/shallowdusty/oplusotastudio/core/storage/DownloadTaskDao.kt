@@ -40,6 +40,11 @@ interface DownloadTaskDao {
                 OR state != 'Paused'
                 OR pauseReason != 'User'
             )
+            AND state NOT IN ('Verified', 'Unverified', 'Canceled')
+            AND NOT (
+                state = 'Failed'
+                AND COALESCE(retriesRemaining, 0) <= 0
+            )
         """,
     )
     suspend fun updateStateColumns(

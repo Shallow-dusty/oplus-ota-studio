@@ -241,6 +241,38 @@ class WorkScheduledDownloadEngineTest {
     }
 
     @Test
+    fun `pause does not overwrite terminal state reached while work is canceling`() = runTest {
+        val store = RecordingDownloadTaskStore(
+            initialTasks = listOf(
+                storedTask(
+                    taskId = "task-1",
+                    state = DownloadState.Running(
+                        downloadedBytes = 5L,
+                        targetSize = 10L,
+                        speedBytesPerSec = null,
+                    ),
+                ),
+            ),
+        )
+        val scheduler = RecordingDownloadWorkScheduler().also { scheduler ->
+            scheduler.onCancel = {
+                store.forceState("task-1", DownloadState.Verified)
+            }
+        }
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/pause-terminal-race"),
+        )
+        val task = engine.observeAll().first().single()
+
+        task.pause()
+
+        assertEquals(listOf("task-1"), scheduler.canceled)
+        assertEquals(DownloadState.Verified, task.state.first())
+    }
+
+    @Test
     fun `rescheduleRecoverableTasks recovers interrupted running task`() = runTest {
         val store = RecordingDownloadTaskStore(
             initialTasks = listOf(
@@ -401,6 +433,7 @@ class WorkScheduledDownloadEngineTest {
     private class RecordingDownloadWorkScheduler : DownloadTaskWorkScheduler {
         val scheduled = mutableListOf<String>()
         val canceled = mutableListOf<String>()
+        var onCancel: (String) -> Unit = {}
 
         override suspend fun schedule(taskId: String) {
             scheduled += taskId
@@ -414,6 +447,7 @@ class WorkScheduledDownloadEngineTest {
 
         override fun cancel(taskId: String) {
             canceled += taskId
+            onCancel(taskId)
         }
     }
 
@@ -477,6 +511,12 @@ class WorkScheduledDownloadEngineTest {
         }
 
         override fun observeTasks(): Flow<List<StoredDownloadTask>> = tasks
+
+        fun forceState(taskId: String, state: DownloadState) {
+            tasks.value = tasks.value.map { task ->
+                if (task.taskId == taskId) task.copy(state = state) else task
+            }
+        }
     }
 
     private data class CreatedTask(

@@ -104,6 +104,7 @@ class WorkScheduledDownloadEngine(
             override suspend fun pause() {
                 if (currentState()?.isTerminal == true) return
                 scheduler.cancel(taskId)
+                if (currentState()?.isTerminal == true) return
                 taskStore.updateState(
                     taskId = taskId,
                     state = DownloadState.Paused(DownloadState.Paused.PauseReason.User),
