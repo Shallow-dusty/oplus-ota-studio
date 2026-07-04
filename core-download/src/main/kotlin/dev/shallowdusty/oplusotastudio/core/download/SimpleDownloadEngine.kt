@@ -112,6 +112,7 @@ class SimpleDownloadEngine(
                 retriesRemaining = 0,
                 raw = "Download task not found: $taskId",
             )
+        recoverPromotedStoredTask(storedTask)?.let { recovered -> return recovered }
         if (storedTask.state.isTerminal || storedTask.state.isUserPaused) return storedTask.state
         pauseStoredTaskForAdmissionGate(taskId)?.let { paused -> return paused }
         val task = SimpleDownloadTask(
@@ -127,6 +128,17 @@ class SimpleDownloadEngine(
         } finally {
             activeStoredTasks.remove(taskId, task)
         }
+    }
+
+    private suspend fun recoverPromotedStoredTask(storedTask: StoredDownloadTask): DownloadState? {
+        if (storedTask.state.isTerminal || storedTask.finalFilePath.isNullOrBlank()) return null
+        val recovered = storedTask.pkg.promotedCompletionState()
+        taskStore?.updateState(
+            taskId = storedTask.taskId,
+            state = recovered,
+            updatedAtMs = nowMs(),
+        )
+        return recovered
     }
 
     fun stopStoredTask(taskId: String) {
@@ -806,3 +818,10 @@ private val DownloadState.isTerminal: Boolean
 
 private val DownloadState.isUserPaused: Boolean
     get() = this == DownloadState.Paused(DownloadState.Paused.PauseReason.User)
+
+private fun OtaPackage.promotedCompletionState(): DownloadState =
+    if (md5.isNullOrBlank() && sha256.isNullOrBlank()) {
+        DownloadState.Unverified
+    } else {
+        DownloadState.Verified
+    }

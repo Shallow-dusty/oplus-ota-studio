@@ -790,6 +790,82 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `execute stored task finalizes promoted verified row without redownloading`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val tempRoot = testTempRoot("execute-stored-promoted-verified")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempRoot.resolve("task-1.zip.part").path,
+                    finalFilePath = "content://downloads/pkg.zip",
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = DownloadState.Verifying,
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val finalState = engine.executeStoredTask("task-1")
+
+        assertEquals(DownloadState.Verified, finalState)
+        assertEquals(0, server.requestCount)
+        assertEquals(DownloadState.Verified, store.updates.single().state)
+    }
+
+    @Test
+    fun `execute stored task finalizes promoted unverified row without redownloading`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val tempRoot = testTempRoot("execute-stored-promoted-unverified")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = null,
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempRoot.resolve("task-1.zip.part").path,
+                    finalFilePath = "content://downloads/pkg.zip",
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = DownloadState.Verifying,
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val finalState = engine.executeStoredTask("task-1")
+
+        assertEquals(DownloadState.Unverified, finalState)
+        assertEquals(0, server.requestCount)
+        assertEquals(DownloadState.Unverified, store.updates.single().state)
+    }
+
+    @Test
     fun `stopStoredTask pauses active persisted download without verifying partial file`() = runTest {
         val body = "abcdef"
         server.enqueue(
