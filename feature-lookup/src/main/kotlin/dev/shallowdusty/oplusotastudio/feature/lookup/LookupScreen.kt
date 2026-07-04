@@ -118,11 +118,13 @@ private fun PrivacyDisclosureContent(
         SummaryRow(stringResource(R.string.lookup_label_model), state.profile.model)
         SummaryRow(stringResource(R.string.lookup_label_region), state.profile.region.name)
         SummaryRow(stringResource(R.string.lookup_label_ota_version), state.profile.otaVersion)
-        Text(
-            presentation.details[1].asString(),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        presentation.details.drop(1).forEach { detail ->
+            Text(
+                detail.asString(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Button(onClick = onContinue, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.lookup_continue))
         }
