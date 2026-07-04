@@ -226,6 +226,17 @@ class SimpleDownloadEngine(
         }
 
         private suspend fun runDownload() {
+            var failedAttempts = 0
+            completePartialOutcome()?.let { outcome ->
+                when (outcome) {
+                    DownloadAttemptOutcome.Finished -> return
+                    is DownloadAttemptOutcome.Failed -> {
+                        failedAttempts += 1
+                        if (!retryOrFinish(outcome, failedAttempts)) return
+                    }
+                }
+            }
+
             storagePreflightFailure()?.let { failure ->
                 updateState(
                     DownloadState.Failed(
@@ -237,7 +248,6 @@ class SimpleDownloadEngine(
                 return
             }
 
-            var failedAttempts = 0
             while (coroutineContext.isActive && !isUserStopped()) {
                 val outcome = try {
                     runDownloadAttempt()

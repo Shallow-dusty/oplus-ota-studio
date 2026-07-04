@@ -1006,7 +1006,7 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
-    fun `execute stored task verifies complete partial without redownloading`() = runTest {
+    fun `execute stored task verifies complete partial before storage preflight`() = runTest {
         server.enqueue(MockResponse(code = 416))
         server.enqueue(MockResponse(code = 200, body = "abc"))
         server.start()
@@ -1024,9 +1024,9 @@ class SimpleDownloadEngineTest {
                     pkg = pkg,
                     tempFilePath = tempFile.path,
                     finalFilePath = null,
-                    etag = "\"abc\"",
+                    etag = null,
                     lastModified = null,
-                    acceptRanges = true,
+                    acceptRanges = false,
                     state = DownloadState.Running(3L, 3L, null),
                     updatedAtMs = 100L,
                 ),
@@ -1037,6 +1037,14 @@ class SimpleDownloadEngineTest {
             tempRoot = tempRoot,
             scope = backgroundScope,
             taskStore = store,
+            storagePreflight = DownloadStoragePreflight(reserveBytes = 1L),
+            storageSnapshotProvider = {
+                DownloadStorageSnapshot(
+                    tempAvailableBytes = 4L,
+                    finalAvailableBytes = 4L,
+                    tempAndFinalShareVolume = true,
+                )
+            },
         )
 
         val finalState = engine.executeStoredTask("task-1")
