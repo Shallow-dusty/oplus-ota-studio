@@ -29,6 +29,17 @@ class WorkScheduledDownloadEngine(
         tempRoot.mkdirs()
         val taskId = idGenerator()
         val tempFile = tempRoot.resolve("$taskId.zip.part")
+        val activeTasks = taskStore.observeTasks()
+            .first()
+            .count { task -> !task.state.isTerminal }
+        if (activeTasks >= maxQueuedTasks) {
+            return rejectAndPersist(
+                taskId = taskId,
+                pkg = pkg,
+                tempFile = tempFile,
+                raw = "Download queue limit reached ($maxQueuedTasks tasks)",
+            )
+        }
         admissionGate.rejectionReason()?.let { reason ->
             val pauseReason = admissionGate.rejectionPauseReason()
             return if (pauseReason != null) {
@@ -46,17 +57,6 @@ class WorkScheduledDownloadEngine(
                     raw = reason,
                 )
             }
-        }
-        val activeTasks = taskStore.observeTasks()
-            .first()
-            .count { task -> !task.state.isTerminal }
-        if (activeTasks >= maxQueuedTasks) {
-            return rejectAndPersist(
-                taskId = taskId,
-                pkg = pkg,
-                tempFile = tempFile,
-                raw = "Download queue limit reached ($maxQueuedTasks tasks)",
-            )
         }
         taskStore.createQueuedTask(
             taskId = taskId,

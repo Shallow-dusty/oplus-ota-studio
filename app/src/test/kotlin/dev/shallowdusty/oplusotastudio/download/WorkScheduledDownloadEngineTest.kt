@@ -71,6 +71,43 @@ class WorkScheduledDownloadEngineTest {
     }
 
     @Test
+    fun `enqueue applies queue limit before battery pause persistence`() = runTest {
+        val store = RecordingDownloadTaskStore(
+            initialTasks = listOf(
+                storedTask(
+                    taskId = "existing",
+                    state = DownloadState.Queued,
+                ),
+            ),
+        )
+        val scheduler = RecordingDownloadWorkScheduler()
+        val engine = WorkScheduledDownloadEngine(
+            taskStore = store,
+            scheduler = scheduler,
+            tempRoot = File("build/tmp/work-scheduled-download-engine/battery-paused-over-limit"),
+            idGenerator = { "battery-paused-over-limit" },
+            maxQueuedTasks = 1,
+            admissionGate = object : DownloadAdmissionGate {
+                override fun rejectionReason(): String = "Battery is below 20%; new downloads are paused."
+
+                override fun rejectionPauseReason(): DownloadState.Paused.PauseReason =
+                    DownloadState.Paused.PauseReason.BatteryLow
+            },
+        )
+
+        val task = engine.enqueue(samplePackage())
+
+        val failed = task.state.first() as DownloadState.Failed
+        assertEquals(OtaErrorCategory.File, failed.category)
+        assertEquals(0, failed.retriesRemaining)
+        assertTrue(failed.raw?.contains("queue limit") == true)
+        val persisted = engine.observeAll().first().single { it.taskId == "battery-paused-over-limit" }
+        assertEquals(failed, persisted.state.first())
+        assertEquals("battery-paused-over-limit", store.created.single().taskId)
+        assertTrue(scheduler.scheduled.isEmpty())
+    }
+
+    @Test
     fun `enqueue rejects new task when admission gate blocks downloads`() = runTest {
         val store = RecordingDownloadTaskStore()
         val scheduler = RecordingDownloadWorkScheduler()
