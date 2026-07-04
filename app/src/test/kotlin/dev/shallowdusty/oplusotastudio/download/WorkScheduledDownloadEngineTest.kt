@@ -119,7 +119,7 @@ class WorkScheduledDownloadEngineTest {
         val persisted = engine.observeAll().first().single()
         assertEquals(paused, persisted.state.first())
         assertEquals("battery-paused", store.created.single().taskId)
-        assertTrue(scheduler.scheduled.isEmpty())
+        assertEquals(listOf("battery-paused"), scheduler.scheduled)
     }
 
     @Test

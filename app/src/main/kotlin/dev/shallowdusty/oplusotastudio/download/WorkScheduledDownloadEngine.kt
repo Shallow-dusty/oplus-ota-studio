@@ -149,6 +149,7 @@ class WorkScheduledDownloadEngine(
             state = DownloadState.Paused(reason),
             updatedAtMs = nowMs(),
         )
+        scheduler.schedule(taskId)
         return storedTaskHandle(taskId, tempFile)
     }
 
