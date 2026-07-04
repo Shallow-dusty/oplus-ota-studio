@@ -113,6 +113,7 @@ class SimpleDownloadEngine(
                 raw = "Download task not found: $taskId",
             )
         if (storedTask.state.isTerminal || storedTask.state.isUserPaused) return storedTask.state
+        pauseStoredTaskForAdmissionGate(taskId)?.let { paused -> return paused }
         val task = SimpleDownloadTask(
             taskId = storedTask.taskId,
             pkg = storedTask.pkg,
@@ -130,6 +131,18 @@ class SimpleDownloadEngine(
 
     fun stopStoredTask(taskId: String) {
         activeStoredTasks[taskId]?.stopActiveTransfer()
+    }
+
+    private suspend fun pauseStoredTaskForAdmissionGate(taskId: String): DownloadState.Paused? {
+        if (admissionGate.rejectionReason() == null) return null
+        val pauseReason = admissionGate.rejectionPauseReason() ?: return null
+        val paused = DownloadState.Paused(pauseReason)
+        taskStore?.updateState(
+            taskId = taskId,
+            state = paused,
+            updatedAtMs = nowMs(),
+        )
+        return paused
     }
 
     private inner class SimpleDownloadTask(

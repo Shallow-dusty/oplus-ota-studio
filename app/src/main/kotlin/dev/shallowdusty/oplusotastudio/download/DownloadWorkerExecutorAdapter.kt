@@ -32,6 +32,12 @@ object DownloadWorkerExecutionMapper {
             DownloadState.Verified,
             DownloadState.Unverified -> DownloadWorkerExecutionResult.Succeeded
             is DownloadState.Retrying -> DownloadWorkerExecutionResult.Retry
+            is DownloadState.Paused ->
+                if (state.reason == DownloadState.Paused.PauseReason.User) {
+                    DownloadWorkerExecutionResult.Failed
+                } else {
+                    DownloadWorkerExecutionResult.Retry
+                }
             is DownloadState.Failed ->
                 if (state.category.isRetriable && state.retriesRemaining > 0) {
                     DownloadWorkerExecutionResult.Retry

@@ -50,6 +50,30 @@ class DownloadWorkerExecutorAdapterTest {
     }
 
     @Test
+    fun `returns retry when stored task remains automatically paused`() = runTest {
+        val executor = DownloadWorkerExecutorAdapter {
+            DownloadState.Paused(DownloadState.Paused.PauseReason.BatteryLow)
+        }
+
+        assertEquals(
+            DownloadWorkerExecutionResult.Retry,
+            executor.execute("task-1"),
+        )
+    }
+
+    @Test
+    fun `returns failure when stored task remains user paused`() = runTest {
+        val executor = DownloadWorkerExecutorAdapter {
+            DownloadState.Paused(DownloadState.Paused.PauseReason.User)
+        }
+
+        assertEquals(
+            DownloadWorkerExecutionResult.Failed,
+            executor.execute("task-1"),
+        )
+    }
+
+    @Test
     fun `returns failure when stored task fails terminally`() = runTest {
         val executor = DownloadWorkerExecutorAdapter {
             DownloadState.Failed(

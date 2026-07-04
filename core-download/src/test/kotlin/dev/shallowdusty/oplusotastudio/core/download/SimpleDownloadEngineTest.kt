@@ -923,6 +923,89 @@ class SimpleDownloadEngineTest {
     }
 
     @Test
+    fun `execute stored task stays paused while admission gate rejects recoverably`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val tempRoot = testTempRoot("execute-stored-admission-paused")
+        val paused = DownloadState.Paused(DownloadState.Paused.PauseReason.BatteryLow)
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempRoot.resolve("task-1.zip.part").path,
+                    finalFilePath = null,
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = DownloadState.Queued,
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            admissionGate = object : DownloadAdmissionGate {
+                override fun rejectionReason(): String =
+                    "Battery is below 40%; new downloads are paused."
+
+                override fun rejectionPauseReason(): DownloadState.Paused.PauseReason =
+                    DownloadState.Paused.PauseReason.BatteryLow
+            },
+        )
+
+        val finalState = engine.executeStoredTask("task-1")
+
+        assertEquals(paused, finalState)
+        assertEquals(listOf(StateUpdate("task-1", paused)), store.updates)
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `execute stored automatic pause runs when admission gate allows`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = "abc"))
+        server.start()
+        val tempRoot = testTempRoot("execute-stored-auto-paused-allowed")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = "900150983cd24fb0d6963f7d28e17f72",
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempRoot.resolve("task-1.zip.part").path,
+                    finalFilePath = null,
+                    etag = null,
+                    lastModified = null,
+                    acceptRanges = false,
+                    state = DownloadState.Paused(DownloadState.Paused.PauseReason.BatteryLow),
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+        )
+
+        val finalState = engine.executeStoredTask("task-1")
+
+        assertEquals(DownloadState.Verified, finalState)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
     fun `execute stored task verifies complete partial without redownloading`() = runTest {
         server.enqueue(MockResponse(code = 416))
         server.enqueue(MockResponse(code = 200, body = "abc"))
