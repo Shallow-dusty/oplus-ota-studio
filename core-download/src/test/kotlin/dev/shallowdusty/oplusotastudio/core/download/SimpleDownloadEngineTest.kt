@@ -591,6 +591,7 @@ class SimpleDownloadEngineTest {
                 code = 206,
                 body = "ghij",
                 headers = Headers.Builder()
+                    .add("Content-Range", "bytes 6-9/10")
                     .add("ETag", "\"abc\"")
                     .add("Accept-Ranges", "bytes")
                     .build(),
@@ -704,7 +705,7 @@ class SimpleDownloadEngineTest {
                     1 -> FailingResponseBody(bytesBeforeFailure = "ab", declaredLength = 3L)
                     else -> if (range == "bytes=2-") "c".toResponseBody() else "abc".toResponseBody()
                 }
-                Response.Builder()
+                val responseBuilder = Response.Builder()
                     .request(request)
                     .protocol(Protocol.HTTP_1_1)
                     .code(responseCode)
@@ -712,7 +713,10 @@ class SimpleDownloadEngineTest {
                     .header("Accept-Ranges", "bytes")
                     .header("ETag", "\"abc\"")
                     .body(responseBody)
-                    .build()
+                if (responseCode == 206) {
+                    responseBuilder.header("Content-Range", "bytes 2-2/3")
+                }
+                responseBuilder.build()
             }
             .build()
         val tempRoot = testTempRoot("retry-resume-metadata")
@@ -1399,6 +1403,7 @@ class SimpleDownloadEngineTest {
                 code = 206,
                 body = "c",
                 headers = Headers.Builder()
+                    .add("Content-Range", "bytes 2-2/3")
                     .add("ETag", "\"abc\"")
                     .add("Accept-Ranges", "bytes")
                     .build(),
@@ -1592,6 +1597,80 @@ class SimpleDownloadEngineTest {
                 val failed = update.state as? DownloadState.Failed
                 failed?.category == OtaErrorCategory.Server &&
                     failed.raw == "Server ignored resume range, restarting download from zero"
+            },
+        )
+    }
+
+    @Test
+    fun `restarts from zero when resumed 206 has mismatched content range`() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 206,
+                body = "x",
+                headers = Headers.Builder()
+                    .add("Content-Length", "1")
+                    .add("Content-Range", "bytes 0-0/3")
+                    .add("ETag", "\"abc\"")
+                    .add("Accept-Ranges", "bytes")
+                    .build(),
+            ),
+        )
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body = "abc",
+                headers = Headers.Builder()
+                    .add("ETag", "\"abc\"")
+                    .add("Accept-Ranges", "bytes")
+                    .build(),
+            ),
+        )
+        server.start()
+        val tempRoot = testTempRoot("range-mismatched-content-range")
+        val tempFile = tempRoot.resolve("task-1.zip.part")
+        tempFile.writeText("ab")
+        val pkg = samplePackage(
+            url = server.url("/pkg.zip").toString(),
+            md5 = null,
+        )
+        val store = RecordingDownloadTaskStore(
+            existingTasks = mapOf(
+                "task-1" to StoredDownloadTask(
+                    taskId = "task-1",
+                    pkg = pkg,
+                    tempFilePath = tempFile.path,
+                    finalFilePath = null,
+                    etag = "\"abc\"",
+                    lastModified = null,
+                    acceptRanges = true,
+                    state = DownloadState.Running(2L, 3L, null),
+                    updatedAtMs = 100L,
+                ),
+            ),
+        )
+        val engine = SimpleDownloadEngine(
+            client = OkHttpClient(),
+            tempRoot = tempRoot,
+            scope = backgroundScope,
+            taskStore = store,
+            idGenerator = { "task-1" },
+        )
+
+        val task = engine.enqueue(pkg)
+
+        withTimeout(5.seconds) {
+            task.state.first { it == DownloadState.Unverified }
+        }
+
+        assertEquals("bytes=2-", server.takeRequest().headers["Range"])
+        assertEquals(2, server.requestCount)
+        assertEquals(null, server.takeRequest().headers["Range"])
+        assertEquals("abc", tempFile.readText())
+        assertTrue(
+            store.updates.any { update ->
+                val failed = update.state as? DownloadState.Failed
+                failed?.category == OtaErrorCategory.Server &&
+                    failed.raw == "Server sent mismatched resume range, restarting download from zero"
             },
         )
     }

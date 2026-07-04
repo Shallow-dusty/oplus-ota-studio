@@ -324,6 +324,30 @@ class SimpleDownloadEngine(
                 rangeStart = null
                 response = executeRequest(rangeStart)
             }
+            if (
+                rangeStart != null &&
+                response.code == 206 &&
+                contentRangeStart(response) != rangeStart
+            ) {
+                response.close()
+                updateState(
+                    DownloadState.Failed(
+                        category = OtaErrorCategory.Server,
+                        retriesRemaining = maxAttempts - 1,
+                        raw = "Server sent mismatched resume range, restarting download from zero",
+                    ),
+                )
+                updateState(
+                    DownloadState.Retrying(
+                        attempt = 1,
+                        maxAttempts = maxAttempts,
+                        category = OtaErrorCategory.Server,
+                    ),
+                )
+                tempFile.delete()
+                rangeStart = null
+                response = executeRequest(rangeStart)
+            }
             var targetSize: Long? = null
             var downloaded = 0L
             response.use {
@@ -513,6 +537,17 @@ class SimpleDownloadEngine(
                 return contentRangeTotalSize(response) ?: contentLength?.let { rangeStart + it }
             }
             return contentLength
+        }
+
+        private fun contentRangeStart(response: Response): Long? {
+            val contentRange = response.header("Content-Range")?.trim() ?: return null
+            val separatorIndex = contentRange.indexOf(' ')
+            if (separatorIndex <= 0) return null
+            if (!contentRange.substring(0, separatorIndex).equals("bytes", ignoreCase = true)) return null
+            return contentRange.substring(separatorIndex + 1)
+                .substringBefore('-')
+                .trim()
+                .toLongOrNull()
         }
 
         private fun contentRangeTotalSize(response: Response): Long? {
