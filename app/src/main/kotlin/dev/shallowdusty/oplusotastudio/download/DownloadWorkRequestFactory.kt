@@ -23,7 +23,7 @@ class DownloadWorkRequestFactory {
                             NetworkType.CONNECTED
                         },
                     )
-                    .setRequiresBatteryNotLow(true)
+                    .setRequiresBatteryNotLow(preferences.batteryPauseThresholdPercent > 0)
                     .build(),
             )
             .setInputData(workDataOf(DownloadWorker.TaskIdKey to taskId))

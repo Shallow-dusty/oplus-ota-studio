@@ -3,6 +3,7 @@ package dev.shallowdusty.oplusotastudio.download
 import androidx.work.NetworkType
 import dev.shallowdusty.oplusotastudio.core.model.DownloadPreferences
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -30,5 +31,15 @@ class DownloadWorkRequestFactoryTest {
 
         assertEquals(NetworkType.CONNECTED, request.workSpec.constraints.requiredNetworkType)
         assertEquals("task-2", request.workSpec.input.getString(DownloadWorker.TaskIdKey))
+    }
+
+    @Test
+    fun `omits battery constraint when battery pause threshold is disabled`() {
+        val request = DownloadWorkRequestFactory().create(
+            taskId = "task-3",
+            preferences = DownloadPreferences(batteryPauseThresholdPercent = 0),
+        )
+
+        assertFalse(request.workSpec.constraints.requiresBatteryNotLow())
     }
 }
